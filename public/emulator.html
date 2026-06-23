@@ -24,6 +24,13 @@
         // Button map: button name -> standard gamepad button index (Xbox layout: A=0, B=1, X=2, Y=3)
         const MAP = { "UP": 12, "DOWN": 13, "LEFT": 14, "RIGHT": 15, "A": 0, "B": 1, "X": 2, "Y": 3, "SELECT": 8, "START": 9, "L1": 4, "R1": 5 };
 
+        // Debug overlay
+        const debugDiv = document.createElement('div');
+        debugDiv.id = 'debug';
+        debugDiv.style.cssText = 'position:fixed;bottom:10px;left:10px;z-index:99999;color:#0f0;font:10px monospace;background:rgba(0,0,0,0.8);padding:6px 10px;border-radius:6px;pointer-events:none;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        document.body.appendChild(debugDiv);
+        function dbg(m) { debugDiv.textContent = m; }
+
         // 4 player button states
         const players = [{}, {}, {}, {}];
 
@@ -36,6 +43,13 @@
                     btns[MAP[k]] = { pressed: down, value: down ? 1.0 : 0, touched: down };
                 }
             }
+            // Show active buttons for all players
+            let active = '';
+            for (let p = 0; p < 4; p++) {
+                const a = Object.entries(players[p]).filter(([,v]) => v === 'down').map(([k]) => k).join(',');
+                if (a) active += `P${p+1}:${a} `;
+            }
+            dbg(active || 'Waiting for input...');
             return {
                 id: "Virtual SR5 Player " + (index + 1),
                 index: index,
@@ -64,6 +78,7 @@
                 const p = e.data.player;
                 if (p >= 0 && p <= 3) {
                     players[p][e.data.button] = e.data.state;
+                    dbg(`P${p+1} ${e.data.button}=${e.data.state}`);
                 }
             }
         });
