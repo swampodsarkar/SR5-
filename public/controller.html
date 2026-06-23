@@ -9,469 +9,266 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { background: #07070a; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; height: 100dvh; height: 100svh; touch-action: none; user-select: none; }
+    body { background: #07070a; color: #fff; font-family: system-ui, sans-serif; height: 100dvh; height: 100svh; overflow: hidden; touch-action: none; user-select: none; }
     .container { height: 100dvh; height: 100svh; display: flex; flex-direction: column; max-width: 500px; margin: 0 auto; padding: 8px 12px; }
 
-    /* header */
-    .header { display: flex; justify-content: space-between; align-items: center; padding: 4px; gap: 8px; flex-shrink: 0; }
-    .status { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 4px; flex-shrink: 0; }
+    .status { display: flex; align-items: center; gap: 6px; }
     .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .dot.online { background: #34d399; box-shadow: 0 0 8px #34d399; }
-    .dot.offline { background: #ef4444; }
-    .player-tag { font-size: 10px; font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
-    .player-tag.p1 { color: #06b6d4; }
-    .player-tag.p2 { color: #a855f7; }
-    .code-display { font-family: monospace; font-size: 11px; color: #00ffcc; letter-spacing: 2px; }
-    .latency { font-size: 9px; color: #666; font-family: monospace; white-space: nowrap; }
-    .toggles { display: flex; gap: 4px; flex-shrink: 0; }
-    .toggles button { background: #1a1a24; border: 1px solid #ffffff15; width: 32px; height: 32px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .toggles button.off { opacity: 0.4; }
-    .toggles button.danger { color: #ef4444; }
+    .dot.on { background: #34d399; box-shadow: 0 0 8px #34d399; }
+    .dot.off { background: #444; }
+    .tag { font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+    .tag.p1 { color: #06b6d4; }
+    .tag.p2 { color: #a855f7; }
+    .cod { font-family: monospace; font-size: 11px; color: #00ffcc; letter-spacing: 2px; }
+    .lat { font-size: 9px; color: #666; font-family: monospace; }
+    .tog { display: flex; gap: 4px; }
+    .tog button { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #ffffff15; background: #1a1a24; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .tog button.off { opacity: 0.4; }
+    .tog button.red { color: #ef4444; }
 
-    /* gamepad area */
-    .pad-area { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; min-height: 0; }
+    .pad { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; min-height: 0; }
 
     .dpad { position: relative; width: 160px; height: 160px; background: #111118; border-radius: 50%; border: 3px solid #000; box-shadow: 0 8px 32px #00000080, inset 0 2px 4px #ffffff08; flex-shrink: 0; }
-    .dpad-center { position: absolute; inset: 22px; border-radius: 50%; background: #0a0a0f; border: 1px solid #ffffff08; }
-    .dpad-btn { position: absolute; background: #1a1a24; border: none; color: #ffffff40; font-size: 13px; cursor: pointer; transition: all 60ms; display: flex; align-items: center; justify-content: center; }
-    .dpad-btn:active, .dpad-btn.active { background: #00ffcc20; color: #00ffcc; box-shadow: 0 0 12px #00ffcc30; }
+    .dpad-c { position: absolute; inset: 22px; border-radius: 50%; background: #0a0a0f; border: 1px solid #ffffff08; }
+    .dpad-btn { position: absolute; background: #1a1a24; border: none; color: #ffffff40; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 60ms, color 60ms; }
+    .dpad-btn.a { background: #00ffcc20; color: #00ffcc; }
     .dpad-up { top: 0; left: 50%; transform: translateX(-50%); width: 60px; height: 38px; border-radius: 0 0 8px 8px; }
     .dpad-down { bottom: 0; left: 50%; transform: translateX(-50%); width: 60px; height: 38px; border-radius: 8px 8px 0 0; }
     .dpad-left { left: 0; top: 50%; transform: translateY(-50%); width: 38px; height: 60px; border-radius: 0 8px 8px 0; }
     .dpad-right { right: 0; top: 50%; transform: translateY(-50%); width: 38px; height: 60px; border-radius: 8px 0 0 8px; }
 
-    .shoulders { display: flex; gap: 10px; width: 100%; max-width: 280px; flex-shrink: 0; }
-    .shoulders button { flex: 1; padding: 8px; background: #1a1a24; border: 1px solid #ffffff08; border-radius: 8px; color: #ffffff60; font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 60ms; }
-    .shoulders button:active, .shoulders button.active { background: #6366f1; color: #fff; transform: scale(0.95); box-shadow: 0 0 10px #6366f150; }
+    .sh { display: flex; gap: 10px; width: 100%; max-width: 280px; flex-shrink: 0; }
+    .sh button { flex: 1; padding: 8px; background: #1a1a24; border: 1px solid #ffffff08; border-radius: 8px; color: #ffffff60; font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: background 60ms, color 60ms; }
+    .sh button.a { background: #6366f1; color: #fff; }
 
-    .mid-row { display: flex; align-items: center; gap: 20px; width: 100%; justify-content: center; flex-shrink: 0; }
+    .mid { display: flex; align-items: center; gap: 20px; width: 100%; justify-content: center; flex-shrink: 0; }
 
-    .actions { position: relative; width: 180px; height: 150px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-    .action-btn { position: absolute; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #ffffff15; font-size: 16px; font-weight: 800; cursor: pointer; transition: all 60ms; display: flex; align-items: center; justify-content: center; }
-    .action-btn:active, .action-btn.active { transform: scale(0.88); }
-    .btn-y { top: 0; left: 50%; transform: translateX(-50%); background: #1a1a24; color: #10b981; }
-    .btn-y:active, .btn-y.active { background: #10b981; color: #000; box-shadow: 0 0 10px #10b98150; }
-    .btn-x { right: 0; top: 50%; transform: translateY(-50%); background: #1a1a24; color: #3b82f6; }
-    .btn-x:active, .btn-x.active { background: #3b82f6; color: #000; box-shadow: 0 0 10px #3b82f650; }
-    .btn-b { left: 0; top: 50%; transform: translateY(-50%); background: #1a1a24; color: #f59e0b; }
-    .btn-b:active, .btn-b.active { background: #f59e0b; color: #000; box-shadow: 0 0 10px #f59e0b50; }
-    .btn-a { bottom: 0; left: 50%; transform: translateX(-50%); background: #1a1a24; color: #ef4444; }
-    .btn-a:active, .btn-a.active { background: #ef4444; color: #000; box-shadow: 0 0 10px #ef444450; }
+    .act { position: relative; width: 180px; height: 150px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .act-btn { position: absolute; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #ffffff15; font-size: 16px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 60ms, background 60ms; }
+    .act-btn.a { transform: scale(0.88); }
+    .by { top: 0; left: 50%; transform: translateX(-50%); background: #1a1a24; color: #10b981; }
+    .by.a { background: #10b981; color: #000; box-shadow: 0 0 10px #10b98150; }
+    .bx { right: 0; top: 50%; transform: translateY(-50%); background: #1a1a24; color: #3b82f6; }
+    .bx.a { background: #3b82f6; color: #000; box-shadow: 0 0 10px #3b82f650; }
+    .bb { left: 0; top: 50%; transform: translateY(-50%); background: #1a1a24; color: #f59e0b; }
+    .bb.a { background: #f59e0b; color: #000; box-shadow: 0 0 10px #f59e0b50; }
+    .ba { bottom: 0; left: 50%; transform: translateX(-50%); background: #1a1a24; color: #ef4444; }
+    .ba.a { background: #ef4444; color: #000; box-shadow: 0 0 10px #ef444450; }
 
-    .bottom-row { display: flex; justify-content: center; gap: 28px; padding: 6px 0; flex-shrink: 0; }
-    .pill { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-    .pill button { width: 50px; height: 20px; border-radius: 20px; background: linear-gradient(180deg,#1a1a24,#0d0d14); border: 1px solid #ffffff08; cursor: pointer; transition: all 60ms; }
-    .pill button:active, .pill button.active { background: linear-gradient(180deg,#cbd5e1,#94a3b8); transform: scale(0.95); }
-    .pill span { font-size: 7px; color: #ffffff60; font-family: monospace; letter-spacing: 2px; font-weight: 700; }
+    .bot { display: flex; justify-content: center; gap: 28px; padding: 6px 0; flex-shrink: 0; }
+    .bot > div { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .bot button { width: 50px; height: 20px; border-radius: 20px; background: linear-gradient(180deg,#1a1a24,#0d0d14); border: 1px solid #ffffff08; cursor: pointer; }
+    .bot button.a { background: linear-gradient(180deg,#cbd5e1,#94a3b8); }
+    .bot span { font-size: 7px; color: #ffffff60; font-family: monospace; letter-spacing: 2px; font-weight: 700; }
 
-    /* pairing screen */
-    .pairing { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; text-align: center; padding: 20px; }
-    .pairing h1 { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
-    .pairing .sub { font-size: 10px; color: #ffffff40; font-family: monospace; letter-spacing: 2px; }
+    .pair { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; text-align: center; padding: 20px; }
+    .pair h1 { font-size: 20px; font-weight: 800; }
+    .pair .sub { font-size: 10px; color: #ffffff40; font-family: monospace; letter-spacing: 2px; }
 
-    .player-tabs { display: flex; gap: 8px; width: 100%; max-width: 300px; }
-    .player-tabs button { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #ffffff15; background: #0d0d14; color: #ffffff60; font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; transition: all 200ms; }
-    .player-tabs button.active-p1 { background: #06b6d420; border-color: #06b6d460; color: #06b6d4; }
-    .player-tabs button.active-p2 { background: #a855f720; border-color: #a855f760; color: #a855f7; }
+    .ptabs { display: flex; gap: 8px; width: 100%; max-width: 300px; }
+    .ptabs button { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #ffffff15; background: #0d0d14; color: #ffffff60; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .ptabs button.s1 { background: #06b6d420; border-color: #06b6d460; color: #06b6d4; }
+    .ptabs button.s2 { background: #a855f720; border-color: #a855f760; color: #a855f7; }
 
-    .connect-methods { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 300px; }
+    .cm { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; }
+    .cmq { background: #0d0d14; border: 1px solid #ffffff08; border-radius: 14px; padding: 14px; }
+    .cmq button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .q1 { background: #06b6d4; color: #000; } .q2 { background: #a855f7; color: #fff; }
+    .cmm { background: #0d0d14; border: 1px solid #ffffff08; border-radius: 14px; padding: 14px; }
+    .cmm .lbl { font-size: 9px; color: #ffffff40; text-align: left; margin-bottom: 6px; font-family: monospace; font-weight: 700; display: block; }
+    .cmm .rw { display: flex; gap: 8px; }
+    .cmm input { flex: 1; background: #07070a; border: 1px solid #ffffff15; color: #00ffcc; font-size: 20px; letter-spacing: 6px; text-align: center; padding: 10px; border-radius: 10px; font-family: monospace; text-transform: uppercase; outline: none; }
+    .cmm input:focus { border-color: #00ffcc60; }
+    .cmm .rw button { padding: 10px 16px; border-radius: 10px; border: none; color: #000; font-weight: 700; font-size: 11px; cursor: pointer; }
+    .m1 { background: #06b6d4; } .m2 { background: #a855f7; }
 
-    .qr-section { background: #0d0d14; border: 1px solid #ffffff08; border-radius: 16px; padding: 16px; }
-    .qr-section button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; transition: all 200ms; }
-    .qr-btn-p1 { background: #06b6d4; color: #000; }
-    .qr-btn-p2 { background: #a855f7; color: #fff; }
+    .scan-o { position: fixed; inset: 0; z-index: 100; background: #000; display: flex; flex-direction: column; }
+    .scan-o video { width: 100%; flex: 1; object-fit: cover; }
+    .scan-h { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #0a0a0f; }
+    .scan-h span { font-size: 12px; font-weight: 600; }
+    .scan-h button { background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; padding: 4px 12px; }
+    .scan-r { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 200px; height: 200px; border: 2px solid #00ffcc80; border-radius: 16px; box-shadow: 0 0 0 9999px #00000080; pointer-events: none; }
+    .scan-r::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #00ffcc; border-radius: 2px; animation: sl 2s ease-in-out infinite; }
+    @keyframes sl { 0%,100% { top: 0; } 50% { top: calc(100% - 3px); } }
 
-    .manual-section { background: #0d0d14; border: 1px solid #ffffff08; border-radius: 16px; padding: 16px; }
-    .manual-section .label { font-size: 9px; color: #ffffff40; text-align: left; margin-bottom: 8px; font-family: monospace; letter-spacing: 1px; font-weight: 700; display: block; }
-    .manual-section .row { display: flex; gap: 8px; }
-    .manual-section input { flex: 1; background: #07070a; border: 1px solid #ffffff15; color: #00ffcc; font-size: 20px; letter-spacing: 6px; text-align: center; padding: 10px; border-radius: 10px; font-family: monospace; text-transform: uppercase; outline: none; }
-    .manual-section input:focus { border-color: #00ffcc60; }
-    .manual-section button { padding: 10px 16px; border-radius: 10px; border: none; color: #000; font-weight: 700; font-size: 11px; letter-spacing: 1px; cursor: pointer; }
-    .manual-btn-p1 { background: #06b6d4; }
-    .manual-btn-p2 { background: #a855f7; }
-
-    /* QR scanner overlay */
-    .scanner-overlay { position: fixed; inset: 0; z-index: 100; background: #000; display: flex; flex-direction: column; }
-    .scanner-overlay video { width: 100%; flex: 1; object-fit: cover; }
-    .scanner-overlay .scanner-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #0a0a0f; }
-    .scanner-overlay .scanner-header span { font-size: 12px; font-weight: 600; }
-    .scanner-overlay .scanner-header button { background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; padding: 4px 12px; }
-    .scanner-overlay .scanner-footer { padding: 16px; text-align: center; font-size: 11px; color: #ffffff60; }
-    .scanner-overlay .scan-region { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 220px; height: 220px; border: 2px solid #00ffcc80; border-radius: 16px; box-shadow: 0 0 0 9999px #00000080; pointer-events: none; }
-    .scanner-overlay .scan-region::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #00ffcc; border-radius: 2px; animation: scanLine 2s ease-in-out infinite; }
-    @keyframes scanLine { 0%,100% { top: 0; } 50% { top: calc(100% - 3px); } }
-
-    /* responsive */
     @media (max-height: 640px) {
       .dpad { width: 130px; height: 130px; }
-      .dpad-center { inset: 18px; }
+      .dpad-c { inset: 18px; }
       .dpad-up, .dpad-down { width: 50px; height: 30px; }
       .dpad-left, .dpad-right { width: 30px; height: 50px; }
-      .actions { width: 150px; height: 120px; }
-      .action-btn { width: 38px; height: 38px; font-size: 13px; }
-      .mid-row { gap: 12px; }
+      .act { width: 150px; height: 120px; }
+      .act-btn { width: 38px; height: 38px; font-size: 13px; }
+      .mid { gap: 12px; }
     }
   </style>
 </head>
 <body>
-  <div class="container" id="app"></div>
+  <div id="app"></div>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyAeoScw5UK53ElBnNdhtJVAETb3_isOEKs",
-      authDomain: "fram-and-go.firebaseapp.com",
-      databaseURL: "https://fram-and-go-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "fram-and-go",
-      storageBucket: "fram-and-go.firebasestorage.app",
-      messagingSenderId: "781295119002",
-      appId: "1:781295119002:web:4be2d54934395b491c0d23",
-      measurementId: "G-TKPPF986Z0"
-    };
-    firebase.initializeApp(firebaseConfig);
+    const FC = { apiKey: "AIzaSyAeoScw5UK53ElBnNdhtJVAETb3_isOEKs", authDomain: "fram-and-go.firebaseapp.com", databaseURL: "https://fram-and-go-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "fram-and-go", storageBucket: "fram-and-go.firebasestorage.app", messagingSenderId: "781295119002", appId: "1:781295119002:web:4be2d54934395b491c0d23" };
+    firebase.initializeApp(FC);
     const db = firebase.database();
 
-    // ── state ──
-    let activePlayer = 1;         // 1 or 2
-    let p1 = { code: '', connected: false, pressed: {} };
-    let p2 = { code: '', connected: false, pressed: {} };
-    let soundOn = true;
-    let vibOn = true;
-    let scanning = false;
-    let scanStream = null;
-    let scanInterval = null;
+    let ap = 1, p1 = { c: '', on: false, pr: {} }, p2 = { c: '', on: false, pr: {} };
+    let snd = true, vib = true, scan = false, str = null, si = null;
 
-    function getP(n) { return n === 2 ? p2 : p1; }
+    function gp(n) { return n === 2 ? p2 : p1; }
 
-    // ── audio ──
-    let audioCtx = null;
-    function playClick() {
-      if (!soundOn) return;
+    let ac = null;
+    function clk() {
+      if (!snd) return;
       try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const o = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(150, audioCtx.currentTime);
-        o.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.04);
-        g.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
-        o.connect(g); g.connect(audioCtx.destination);
-        o.start(); o.stop(audioCtx.currentTime + 0.04);
+        if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+        if (ac.state === 'suspended') ac.resume();
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(150, ac.currentTime); o.frequency.exponentialRampToValueAtTime(300, ac.currentTime + 0.04);
+        g.gain.setValueAtTime(0.3, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.04);
+        o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.04);
       } catch (e) {}
     }
-    function vibrate() { if (vibOn && navigator.vibrate) navigator.vibrate(20); }
+    function vibf() { if (vib && navigator.vibrate) navigator.vibrate(20); }
 
-    // ── firebase ──
-    function sendButton(player, btn, state) {
-      const p = getP(player);
-      if (!p.code || !p.connected) return;
-      const updates = {};
-      updates[`controllers/${p.code}/state/${btn}`] = state;
-      updates[`controllers/${p.code}/state/lastUpdated`] = Date.now();
-      db.ref().update(updates).catch(() => {});
+    function sb(pn, btn, st) {
+      const p = gp(pn);
+      if (!p.c || !p.on) return;
+      const u = {}; u[`controllers/${p.c}/state/${btn}`] = st; u[`controllers/${p.c}/state/lastUpdated`] = Date.now();
+      db.ref().update(u).catch(() => {});
     }
 
-    function press(player, btn) {
-      const p = getP(player);
-      if (p.pressed[btn]) return;
-      p.pressed[btn] = true;
-      playClick(); vibrate();
-      sendButton(player, btn, 'down');
-      render();
+    function prs(pn, btn) {
+      const p = gp(pn); if (p.pr[btn]) return;
+      p.pr[btn] = true; clk(); vibf(); sb(pn, btn, 'down'); r();
     }
-
-    function release(player, btn) {
-      const p = getP(player);
-      if (!p.pressed[btn]) return;
-      p.pressed[btn] = false;
-      sendButton(player, btn, 'up');
-      render();
+    function rel(pn, btn) {
+      const p = gp(pn); if (!p.pr[btn]) return;
+      p.pr[btn] = false; sb(pn, btn, 'up'); r();
     }
-
-    function touchProps(player, btn) {
+    function tp(pn, btn) {
       return {
-        onPointerDown(e) { e.preventDefault(); press(player, btn); },
-        onPointerUp(e) { e.preventDefault(); release(player, btn); },
-        onPointerLeave(e) { e.preventDefault(); release(player, btn); },
-        onPointerCancel(e) { release(player, btn); }
+        onPointerDown(e) { e.preventDefault(); prs(pn, btn); },
+        onPointerUp(e) { e.preventDefault(); rel(pn, btn); },
+        onPointerLeave(e) { e.preventDefault(); rel(pn, btn); },
+        onPointerCancel(e) { rel(pn, btn); }
       };
     }
 
-    // ── connect / disconnect ──
-    function connect(player, targetCode) {
-      const p = getP(player);
-      const code = targetCode.toUpperCase();
-      p.code = code;
-      const connectedRef = db.ref(`controllers/${code}/connected`);
-      const stateRef = db.ref(`controllers/${code}/state`);
-
-      const init = {};
-      ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'].forEach(k => init[k] = 'up');
+    function conn(pn, c) {
+      const p = gp(pn); c = c.toUpperCase(); p.c = c;
+      const cr = db.ref(`controllers/${c}/connected`), sr = db.ref(`controllers/${c}/state`);
+      const init = {}; ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'].forEach(k => init[k] = 'up');
       init.lastUpdated = Date.now();
-      stateRef.set(init).then(() => {
-        connectedRef.set(true);
-        p.connected = true;
-        render();
-
-        const pingRef = db.ref(`controllers/${code}/ping`);
-        setInterval(() => {
-          const start = Date.now();
-          pingRef.set(start).then(() => {
-            const el = document.getElementById('latency' + player);
-            if (el) el.textContent = (Date.now() - start) + 'ms';
-          });
-        }, 5000);
-      }).catch(() => { render(); });
+      sr.set(init).then(() => {
+        cr.set(true); p.on = true; r();
+        setInterval(() => { const s = Date.now(); db.ref(`controllers/${c}/ping`).set(s).then(() => { const el = document.getElementById('lt' + pn); if (el) el.textContent = (Date.now() - s) + 'ms'; }); }, 5000);
+      }).catch(() => r());
+    }
+    function disc(pn) {
+      const p = gp(pn); if (p.c) { db.ref(`controllers/${p.c}/connected`).set(null); db.ref(`controllers/${p.c}/state`).set(null); }
+      p.on = false; p.c = ''; p.pr = {}; r();
     }
 
-    function disconnect(player) {
-      const p = getP(player);
-      if (p.code) {
-        db.ref(`controllers/${p.code}/connected`).set(null);
-        db.ref(`controllers/${p.code}/state`).set(null);
+    function startScan(pn) {
+      if (scan) return; scan = true;
+      document.getElementById('app').innerHTML = `
+        <div class="scan-o">
+          <div class="scan-h"><span>Player ${pn} — Scan QR</span><button onclick="stopScan()">✕</button></div>
+          <div style="position:relative;flex:1;overflow:hidden"><video id="qv" autoplay playsinline muted></video><div class="scan-r"></div></div>
+          <div style="padding:12px;text-align:center;font-size:11px;color:#ffffff60">Point camera at QR code on console</div>
+        </div>`;
+      const v = document.getElementById('qv');
+      const ca = document.createElement('canvas'), cx = ca.getContext('2d');
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 480 } }).then(s => {
+        str = s; v.srcObject = s; v.play();
+        si = setInterval(() => {
+          if (v.readyState !== 4) return;
+          ca.width = v.videoWidth; ca.height = v.videoHeight; cx.drawImage(v, 0, 0, ca.width, ca.height);
+          const r = jsQR(cx.getImageData(0, 0, ca.width, ca.height).data, ca.width, ca.height);
+          if (r && r.data) {
+            let code = '';
+            const m = r.data.match(/[?&]code=([A-Z0-9]{6})/i);
+            if (m) code = m[1].toUpperCase();
+            else { const cl = r.data.replace(/[^A-Z0-9]/g, '').toUpperCase(); if (cl.length >= 6) code = cl.substring(0, 6); }
+            if (code.length === 6) { stopScan(); conn(pn, code); }
+          }
+        }, 200);
+      }).catch(() => { scan = false; r(); });
+    }
+    function stopScan() {
+      scan = false; if (si) { clearInterval(si); si = null; }
+      if (str) { str.getTracks().forEach(t => t.stop()); str = null; } r();
+    }
+
+    function sw(pn) { ap = pn; r(); }
+
+    function r() {
+      const both = p1.on && p2.on;
+      if (both) {
+        document.getElementById('app').innerHTML = `<div style="display:flex;flex-direction:column;height:100%;gap:4px">${pd(1,'50%')}<div style="height:1px;background:#ffffff10;flex-shrink:0"></div>${pd(2,'50%')}</div>`;
+        at(1); at(2); return;
       }
-      p.connected = false;
-      p.code = '';
-      p.pressed = {};
-      render();
+      if (p1.on) { document.getElementById('app').innerHTML = pd(1,'100%'); at(1); return; }
+      if (p2.on) { document.getElementById('app').innerHTML = pd(2,'100%'); at(2); return; }
+
+      document.getElementById('app').innerHTML = `
+        <div class="container">
+          <div class="pair">
+            <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 8px 24px #6366f140">🎮</div>
+            <h1>SR5 Remote</h1>
+            <p class="sub">SELECT PLAYER</p>
+            <div class="ptabs">
+              <button class="${ap===1?'s1':''}" onclick="sw(1)">P1 ${p1.on?'✓':''}</button>
+              <button class="${ap===2?'s2':''}" onclick="sw(2)">P2 ${p2.on?'✓':''}</button>
+            </div>
+            <div class="cm">
+              <div class="cmq"><button class="${ap===1?'q1':'q2'}" onclick="startScan(${ap})">📷 Scan QR Code</button></div>
+              <div class="cmm"><span class="lbl">MANUAL CODE</span><div class="rw"><input type="text" maxlength="6" id="mc" placeholder="ABC123" oninput="this.value=this.value.toUpperCase()"><button class="${ap===1?'m1':'m2'}" id="cmb">↵</button></div></div>
+            </div>
+            <p style="font-size:9px;color:#ffffff25;max-width:260px">Open SR5 Console → smartphone icon → scan QR or enter code</p>
+          </div>
+        </div>`;
+      document.getElementById('cmb').onclick = () => { const v = document.getElementById('mc').value; if (v.length === 6) conn(ap, v); };
+      document.getElementById('mc').onkeydown = (e) => { if (e.key === 'Enter') { const v = e.target.value; if (v.length === 6) conn(ap, v); } };
     }
 
-    // ── QR scanner ──
-    function startScanner(player) {
-      if (scanning) return;
-      scanning = true;
-      const el = document.getElementById('app');
-      el.innerHTML = `
-        <div class="scanner-overlay">
-          <div class="scanner-header">
-            <span>Player ${player} — Scan QR Code</span>
-            <button onclick="stopScanner()">✕</button>
-          </div>
-          <div style="position:relative;flex:1;overflow:hidden">
-            <video id="qrVideo" autoplay playsinline muted></video>
-            <div class="scan-region"></div>
-          </div>
-          <div class="scanner-footer">Point your camera at the QR code on the console screen</div>
+    function pd(pn, h) {
+      const p = gp(pn), c = pn===1?'#06b6d4':'#a855f7', nm = 'P'+pn;
+      const a = (b) => p.pr[b] ? 'a' : '';
+      return `<div style="flex:1;display:flex;flex-direction:column;min-height:0;max-height:${h};padding:2px 0" class="container">
+        <div class="header">
+          <div class="status"><span class="dot on"></span><span class="tag ${pn===1?'p1':'p2'}">${nm}</span><span class="cod">${p.c}</span><span class="lat" id="lt${pn}">OK</span></div>
+          <div class="tog"><button id="snd${pn}" class="${snd?'':'off'}">🔊</button><button id="vib${pn}" class="${vib?'':'off'}">📳</button><button class="red" onclick="disc(${pn})">⏻</button></div>
         </div>
-      `;
-
-      const video = document.getElementById('qrVideo');
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 480 } })
-        .then(stream => {
-          scanStream = stream;
-          video.srcObject = stream;
-          video.play();
-
-          scanInterval = setInterval(() => {
-            if (video.readyState !== 4) return;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
-
-            if (result && result.data) {
-              const detected = result.data;
-              // Try to extract 6-char code from URL or direct text
-              let code = '';
-              const match = detected.match(/[?&]code=([A-Z0-9]{6})/i);
-              if (match) {
-                code = match[1].toUpperCase();
-              } else {
-                const clean = detected.replace(/[^A-Z0-9]/g, '').toUpperCase();
-                if (clean.length >= 6) code = clean.substring(0, 6);
-              }
-
-              if (code.length === 6) {
-                stopScanner();
-                connect(player, code);
-              }
-            }
-          }, 200);
-        })
-        .catch(err => {
-          scanning = false;
-          render();
-        });
-    }
-
-    function stopScanner() {
-      scanning = false;
-      if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-      if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
-      render();
-    }
-
-    // ── switch player ──
-    function switchPlayer(n) {
-      activePlayer = n;
-      if (!getP(n).connected) render();
-      else render();
-    }
-
-    // ── render ──
-    function render() {
-      const app = document.getElementById('app');
-      const bothConnected = p1.connected && p2.connected;
-
-      // If both connected, show split view
-      if (bothConnected) {
-        app.innerHTML = `
-          <div style="display:flex;flex-direction:column;height:100%;gap:4px">
-            ${renderPad(1, '50%')}
-            <div style="height:1px;background:#ffffff10;flex-shrink:0"></div>
-            ${renderPad(2, '50%')}
-          </div>
-        `;
-        attachPadEvents(1);
-        attachPadEvents(2);
-        return;
-      }
-
-      // If one player connected, show full pad
-      if (p1.connected) {
-        app.innerHTML = renderPad(1, '100%');
-        attachPadEvents(1);
-        return;
-      }
-      if (p2.connected) {
-        app.innerHTML = renderPad(2, '100%');
-        attachPadEvents(2);
-        return;
-      }
-
-      // Pairing screen
-      app.innerHTML = `
-        <div class="pairing">
-          <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 8px 24px #6366f140">🎮</div>
-          <h1>SR5 Remote</h1>
-          <p class="sub">SELECT PLAYER SLOT</p>
-
-          <div class="player-tabs">
-            <button class="${activePlayer === 1 ? 'active-p1' : ''}" onclick="switchPlayer(1)">
-              P1 ${p1.connected ? '✓' : ''}
-            </button>
-            <button class="${activePlayer === 2 ? 'active-p2' : ''}" onclick="switchPlayer(2)">
-              P2 ${p2.connected ? '✓' : ''}
-            </button>
-          </div>
-
-          <div class="connect-methods">
-            <div class="qr-section">
-              <button class="${activePlayer === 1 ? 'qr-btn-p1' : 'qr-btn-p2'}" onclick="startScanner(${activePlayer})">
-                📷 Scan QR Code
-              </button>
+        <div class="pad">
+          <div class="sh"><button id="L1_${pn}" class="${a('L1')}">L1</button><button id="R1_${pn}" class="${a('R1')}">R1</button></div>
+          <div class="mid">
+            <div class="dpad"><div class="dpad-c"></div>
+              <button class="dpad-btn dpad-up ${a('UP')}" id="UP_${pn}">▲</button>
+              <button class="dpad-btn dpad-down ${a('DOWN')}" id="DOWN_${pn}">▼</button>
+              <button class="dpad-btn dpad-left ${a('LEFT')}" id="LEFT_${pn}">◀</button>
+              <button class="dpad-btn dpad-right ${a('RIGHT')}" id="RIGHT_${pn}">▶</button>
             </div>
-
-            <div class="manual-section">
-              <span class="label">MANUAL SYNC CODE</span>
-              <div class="row">
-                <input type="text" maxlength="6" id="manualCode" placeholder="ABC123" oninput="this.value=this.value.toUpperCase()">
-                <button class="${activePlayer === 1 ? 'manual-btn-p1' : 'manual-btn-p2'}" id="connectManualBtn">
-                  ↵
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <p style="font-size:9px;color:#ffffff25;max-width:260px;line-height:1.5">
-            Open SR5 Console → smartphone icon → scan QR or enter code shown on screen
-          </p>
-        </div>
-      `;
-
-      document.getElementById('connectManualBtn').onclick = () => {
-        const val = document.getElementById('manualCode').value;
-        if (val.length === 6) connect(activePlayer, val);
-      };
-      document.getElementById('manualCode').onkeydown = (e) => {
-        if (e.key === 'Enter') {
-          const val = e.target.value;
-          if (val.length === 6) connect(activePlayer, val);
-        }
-      };
-    }
-
-    function renderPad(player, height) {
-      const p = getP(player);
-      const c = player === 1 ? '#06b6d4' : '#a855f7';
-      const pname = 'P' + player;
-      return `
-        <div style="flex:1;display:flex;flex-direction:column;min-height:0;max-height:${height};padding:2px 0">
-          <div class="header">
-            <div class="status">
-              <span class="dot online"></span>
-              <span class="player-tag ${player === 1 ? 'p1' : 'p2'}">${pname} SYNCED</span>
-              <span class="code-display">${p.code}</span>
-              <span class="latency" id="latency${player}">OK</span>
-            </div>
-            <div class="toggles">
-              <button id="soundBtn${player}" class="${soundOn?'':'off'}">🔊</button>
-              <button id="vibBtn${player}" class="${vibOn?'':'off'}">📳</button>
-              <button class="danger" onclick="disconnect(${player})">⏻</button>
-            </div>
-          </div>
-
-          <div class="pad-area">
-            <div class="shoulders">
-              <button id="L1_${player}" class="${p.pressed['L1']?'active':''}">L1</button>
-              <button id="R1_${player}" class="${p.pressed['R1']?'active':''}">R1</button>
-            </div>
-            <div class="mid-row">
-              <div class="dpad">
-                <div class="dpad-center"></div>
-                <button class="dpad-btn dpad-up" id="UP_${player}">▲</button>
-                <button class="dpad-btn dpad-down" id="DOWN_${player}">▼</button>
-                <button class="dpad-btn dpad-left" id="LEFT_${player}">◀</button>
-                <button class="dpad-btn dpad-right" id="RIGHT_${player}">▶</button>
-              </div>
-              <div class="actions">
-                <button class="action-btn btn-y" id="Y_${player}">Y</button>
-                <button class="action-btn btn-x" id="X_${player}">X</button>
-                <button class="action-btn btn-b" id="B_${player}">B</button>
-                <button class="action-btn btn-a" id="A_${player}">A</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="bottom-row">
-            <div class="pill">
-              <button id="SELECT_${player}" class="${p.pressed['SELECT']?'active':''}"></button>
-              <span>SELECT</span>
-            </div>
-            <div class="pill">
-              <button id="START_${player}" class="${p.pressed['START']?'active':''}"></button>
-              <span>START</span>
+            <div class="act">
+              <button class="act-btn by ${a('Y')}" id="Y_${pn}">Y</button>
+              <button class="act-btn bx ${a('X')}" id="X_${pn}">X</button>
+              <button class="act-btn bb ${a('B')}" id="B_${pn}">B</button>
+              <button class="act-btn ba ${a('A')}" id="A_${pn}">A</button>
             </div>
           </div>
         </div>
-      `;
+        <div class="bot"><div><button id="SELECT_${pn}" class="${a('SELECT')}"></button><span>SELECT</span></div><div><button id="START_${pn}" class="${a('START')}"></button><span>START</span></div></div>
+      </div>`;
     }
 
-    function attachPadEvents(player) {
-      ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'].forEach(btn => {
-        const el = document.getElementById(btn + '_' + player);
-        if (el) Object.assign(el, touchProps(player, btn));
-      });
-      const sb = document.getElementById('soundBtn' + player);
-      if (sb) sb.onclick = () => { soundOn = !soundOn; render(); };
-      const vb = document.getElementById('vibBtn' + player);
-      if (vb) vb.onclick = () => { vibOn = !vibOn; render(); };
+    function at(pn) {
+      ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'].forEach(b => { const el = document.getElementById(b+'_'+pn); if (el) Object.assign(el, tp(pn, b)); });
+      const sb = document.getElementById('snd'+pn); if (sb) sb.onclick = () => { snd = !snd; r(); };
+      const vb = document.getElementById('vib'+pn); if (vb) vb.onclick = () => { vib = !vib; r(); };
     }
 
-    // ── init ──
-    const params = new URLSearchParams(location.search);
-    const urlCode = params.get('code');
-    if (urlCode && urlCode.length === 6) {
-      connect(1, urlCode);
-    } else {
-      render();
-    }
+    const p = new URLSearchParams(location.search), uc = p.get('code');
+    if (uc && uc.length === 6) conn(1, uc); else r();
   </script>
 </body>
 </html>

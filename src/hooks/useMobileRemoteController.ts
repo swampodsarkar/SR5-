@@ -18,10 +18,9 @@ const BUTTON_KEY_MAP: Record<string, { key: string; code: string; keyCode: numbe
   R1: { key: "w", code: "KeyW", keyCode: 87 }
 };
 
-export function simulateKey(state: "down" | "up", button: string) {
+function simulateKey(state: "down" | "up", button: string) {
   const mapping = BUTTON_KEY_MAP[button];
   if (!mapping) return;
-
   const eventType = state === "down" ? "keydown" : "keyup";
   const eventInit: KeyboardEventInit = {
     key: mapping.key,
@@ -31,113 +30,85 @@ export function simulateKey(state: "down" | "up", button: string) {
     bubbles: true,
     cancelable: true,
   };
+  window.dispatchEvent(new KeyboardEvent(eventType, eventInit));
 
-  // Dispatch on the main window
-  const outerEvent = new KeyboardEvent(eventType, eventInit);
-  window.dispatchEvent(outerEvent);
-
-  // Dispatch on any emulator iframe window
   const iframe = document.querySelector("iframe");
   if (iframe && iframe.contentWindow) {
-    const win = iframe.contentWindow as any;
     try {
-      if (win.KeyboardEvent) {
-        const innerEvent = new win.KeyboardEvent(eventType, eventInit);
-        iframe.contentWindow.dispatchEvent(innerEvent);
-      } else {
-        const fallbackEvent = new KeyboardEvent(eventType, eventInit);
-        iframe.contentWindow.dispatchEvent(fallbackEvent);
-      }
-    } catch (err) {
-      // Fallback if the iframe constructor is restricted
-      const fallbackEvent = new KeyboardEvent(eventType, eventInit);
-      iframe.contentWindow.dispatchEvent(fallbackEvent);
+      const win = iframe.contentWindow as any;
+      const Ctor = win.KeyboardEvent || KeyboardEvent;
+      iframe.contentWindow.dispatchEvent(new Ctor(eventType, eventInit));
+    } catch {
+      iframe.contentWindow.dispatchEvent(new KeyboardEvent(eventType, eventInit));
     }
   }
 }
 
+function sendToIframeGamepad(playerIndex: number, button: string, state: "down" | "up") {
+  const iframe = document.querySelector("iframe");
+  if (iframe && iframe.contentWindow) {
+    iframe.contentWindow.postMessage({ type: 'GAMEPAD_UPDATE', player: playerIndex, button, state }, '*');
+  }
+}
+
+function listenToController(
+  code: string,
+  playerIndex: number,
+  setConnected: (c: boolean) => void,
+  prevRef: React.MutableRefObject<Record<string, "down" | "up">>,
+  enableKeyboard: boolean
+) {
+  const connectedRef = ref(rtdb, `controllers/${code}/connected`);
+  const stateRef = ref(rtdb, `controllers/${code}/state`);
+
+  set(connectedRef, null);
+  set(stateRef, null);
+
+  const unsubConnection = onValue(connectedRef, (snap) => setConnected(snap.val() === true));
+
+  const unsubState = onValue(stateRef, (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.val();
+    const buttons = ["UP", "DOWN", "LEFT", "RIGHT", "A", "B", "X", "Y", "SELECT", "START", "L1", "R1"];
+    buttons.forEach((btn) => {
+      const currentVal = data[btn] || "up";
+      if (currentVal !== (prevRef.current[btn] || "up")) {
+        if (enableKeyboard) {
+          simulateKey(currentVal, btn);
+        }
+        sendToIframeGamepad(playerIndex, btn, currentVal);
+        prevRef.current[btn] = currentVal;
+      }
+    });
+  });
+
+  return () => {
+    set(connectedRef, null);
+    set(stateRef, null);
+    unsubConnection();
+    unsubState();
+  };
+}
+
 export function useMobileRemoteController() {
   const { controllerCode, controllerCodeP2, setControllerConnected, setControllerConnectedP2 } = useUIStore();
-  const prevStatesRef = useRef<Record<string, "down" | "up">>({});
-  const prevStatesP2Ref = useRef<Record<string, "down" | "up">>({});
-
-  // Helper to sync to iframe virtual Gamepads natively
-  const sendToIframeGamepad = (playerIndex: number, button: string, state: "down" | "up") => {
-    const iframe = document.querySelector("iframe");
-    if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.postMessage({ type: 'GAMEPAD_UPDATE', player: playerIndex, button, state }, '*');
-    }
-  };
+  const prevP1 = useRef<Record<string, "down" | "up">>({});
+  const prevP2 = useRef<Record<string, "down" | "up">>({});
 
   useEffect(() => {
-    // ---- PLAYER 1 LOGIC ----
+    const cleanups: (() => void)[] = [];
+
     if (controllerCode) {
-      const connectedRef = ref(rtdb, `controllers/${controllerCode}/connected`);
-      const stateRef = ref(rtdb, `controllers/${controllerCode}/state`);
-
-      set(connectedRef, null);
-      set(stateRef, null);
-
-      const unsubConnection = onValue(connectedRef, (snap) => setControllerConnected(snap.val() === true));
-      
-      const unsubState = onValue(stateRef, (snap) => {
-        if (!snap.exists()) return;
-        const data = snap.val();
-        const buttons = ["UP", "DOWN", "LEFT", "RIGHT", "A", "B", "X", "Y", "SELECT", "START", "L1", "R1"];
-        buttons.forEach((btn) => {
-          const currentVal = data[btn] || "up";
-          if (currentVal !== (prevStatesRef.current[btn] || "up")) {
-            simulateKey(currentVal, btn); // Legacy Keyboard Fallback
-            sendToIframeGamepad(0, btn, currentVal); // Native Virtual Gamepad P1
-            prevStatesRef.current[btn] = currentVal;
-          }
-        });
-      });
-
-      // Cleanup
-      (window as any).cleanupP1 = () => {
-        set(connectedRef, null);
-        set(stateRef, null);
-        unsubConnection();
-        unsubState();
-      };
+      cleanups.push(listenToController(controllerCode, 0, setControllerConnected, prevP1, true));
     }
-
-    // ---- PLAYER 2 LOGIC ----
     if (controllerCodeP2) {
-      const connectedP2Ref = ref(rtdb, `controllers/${controllerCodeP2}/connected`);
-      const stateP2Ref = ref(rtdb, `controllers/${controllerCodeP2}/state`);
-
-      set(connectedP2Ref, null);
-      set(stateP2Ref, null);
-
-      const unsubConnectionP2 = onValue(connectedP2Ref, (snap) => setControllerConnectedP2(snap.val() === true));
-      
-      const unsubStateP2 = onValue(stateP2Ref, (snap) => {
-        if (!snap.exists()) return;
-        const data = snap.val();
-        const buttons = ["UP", "DOWN", "LEFT", "RIGHT", "A", "B", "X", "Y", "SELECT", "START", "L1", "R1"];
-        buttons.forEach((btn) => {
-          const currentVal = data[btn] || "up";
-          if (currentVal !== (prevStatesP2Ref.current[btn] || "up")) {
-            sendToIframeGamepad(1, btn, currentVal); // Native Virtual Gamepad P2
-            prevStatesP2Ref.current[btn] = currentVal;
-          }
-        });
-      });
-
-      // Cleanup
-      (window as any).cleanupP2 = () => {
-        set(connectedP2Ref, null);
-        set(stateP2Ref, null);
-        unsubConnectionP2();
-        unsubStateP2();
-      };
+      cleanups.push(listenToController(controllerCodeP2, 1, setControllerConnectedP2, prevP2, true));
     }
 
     return () => {
-      if ((window as any).cleanupP1) { (window as any).cleanupP1(); setControllerConnected(false); }
-      if ((window as any).cleanupP2) { (window as any).cleanupP2(); setControllerConnectedP2(false); }
+      cleanups.forEach(fn => fn());
+      setControllerConnected(false);
+      setControllerConnectedP2(false);
     };
   }, [controllerCode, controllerCodeP2, setControllerConnected, setControllerConnectedP2]);
 }

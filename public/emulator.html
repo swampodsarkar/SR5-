@@ -21,50 +21,51 @@
     <div id="info" class="info"></div>
     <div id="game-container"></div>
     <script>
-        const STs = [{}, {}];
+        // Button map: button name -> standard gamepad button index
         const MAP = { "UP": 12, "DOWN": 13, "LEFT": 14, "RIGHT": 15, "A": 1, "B": 0, "X": 3, "Y": 2, "SELECT": 8, "START": 9, "L1": 4, "R1": 5 };
 
-        function getFakeGamepads() {
-           let arr = [null, null, null, null];
-           for(let i=0; i<2; i++) {
-              if (Object.keys(STs[i]).length > 0) {
-                 let btns = [];
-                 for(let b=0; b<18; b++) btns.push({ pressed: false, value: 0 });
-                 for(let k in STs[i]) {
-                    if(MAP[k] !== undefined) {
-                       btns[MAP[k]].pressed = STs[i][k] === 'down';
-                       btns[MAP[k]].value = STs[i][k] === 'down' ? 1.0 : 0;
-                    }
-                 }
-                 arr[i] = {
-                    id: "Virtual Mobile Gamepad P" + (i+1),
-                    index: i,
-                    connected: true,
-                    timestamp: performance.now(),
-                    mapping: "standard",
-                    axes: [0,0,0,0],
-                    buttons: btns
-                 };
-              }
-           }
-           return arr;
+        // Player 1 and Player 2 button states
+        const players = [{}, {}];
+
+        function buildGamepad(index) {
+            const btns = [];
+            for (let b = 0; b < 18; b++) btns.push({ pressed: false, value: 0, touched: false });
+            for (const k in players[index]) {
+                if (MAP[k] !== undefined) {
+                    const down = players[index][k] === 'down';
+                    btns[MAP[k]] = { pressed: down, value: down ? 1.0 : 0, touched: down };
+                }
+            }
+            return {
+                id: "Virtual SR5 P" + (index + 1),
+                index: index,
+                connected: true,
+                timestamp: performance.now(),
+                mapping: "standard",
+                axes: [0, 0, 0, 0],
+                buttons: btns
+            };
         }
 
-        const origGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : () => [null,null,null,null];
-        navigator.getGamepads = function() {
-            const real = origGetGamepads() || [null,null,null,null];
-            const fake = getFakeGamepads();
+        // Always return 4 gamepad slots (P1, P2 always present)
+        const origGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : () => [null, null, null, null];
+        navigator.getGamepads = function () {
+            const real = origGetGamepads() || [null, null, null, null];
             return [
-                fake[0] || real[0] || null,
-                fake[1] || real[1] || null,
+                buildGamepad(0),
+                buildGamepad(1),
                 real[2] || null,
                 real[3] || null
             ];
         };
 
-        window.addEventListener('message', function(e) {
+        // Listen for gamepad updates from React app (via postMessage)
+        window.addEventListener('message', function (e) {
             if (e.data && e.data.type === 'GAMEPAD_UPDATE') {
-                STs[e.data.player][e.data.button] = e.data.state;
+                const p = e.data.player;
+                if (p === 0 || p === 1) {
+                    players[p][e.data.button] = e.data.state;
+                }
             }
         });
 
@@ -79,16 +80,10 @@
         window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
         window.EJS_color = '#ffffff';
 
-        // GitHub raw URLs support CORS natively — no proxy needed
-        // Just set the URL directly and let EmulatorJS handle fetching
         if (url && url !== 'undefined' && url !== 'null') {
             if (url.startsWith('http')) {
                 const isGitHubRaw = url.includes('raw.githubusercontent.com') || url.includes('githubusercontent.com');
-                if (isGitHubRaw) {
-                    window.EJS_gameUrl = url;
-                } else {
-                    window.EJS_gameUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
-                }
+                window.EJS_gameUrl = isGitHubRaw ? url : 'https://corsproxy.io/?url=' + encodeURIComponent(url);
             } else {
                 window.EJS_gameUrl = url;
             }
