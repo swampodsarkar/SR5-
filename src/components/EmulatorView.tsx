@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Gamepad, Wifi, MessageSquarePlus, Sparkles, Eye, Clock, Coins } from "lucide-react";
+import { ArrowLeft, Gamepad, Wifi, MessageSquarePlus, Sparkles, Eye, Clock, Coins, Monitor, Play, StopCircle } from "lucide-react";
 import { useUIStore } from "../store/uiStore";
 import { auth, rtdb } from "../lib/firebase";
-import { ref, onValue, push, get, update } from "firebase/database";
+import { ref, onValue, push, get, update, set as dbSet } from "firebase/database";
 import { useAudio } from "../hooks/useAudio";
 import { trackGamePlay, checkRental, extendRentalWithAd, watchAdForCoins, checkParentalLimit } from "../hooks/useGameSession";
 
@@ -21,6 +21,88 @@ export function EmulatorView() {
   
   const [roomData, setRoomData] = useState<any>(null);
   const [gameChats, setGameChats] = useState<any[]>([]);
+
+  // PeerJS streaming
+  const [peerJsLoaded, setPeerJsLoaded] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isViewingStream, setIsViewingStream] = useState(false);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const peerRef = useRef<any>(null);
+  const shareStreamRef = useRef<MediaStream | null>(null);
+
+  // Dynamic PeerJS load
+  useEffect(() => {
+    if ((window as any).Peer) { setPeerJsLoaded(true); return; }
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
+    s.onload = () => setPeerJsLoaded(true);
+    document.head.appendChild(s);
+  }, []);
+
+  // Monitor room for streamPeerId (guest flow)
+  useEffect(() => {
+    if (!isPlaying || !activeRoomId || !peerJsLoaded || isSharing) return;
+    const sr = ref(rtdb, `rooms/${activeRoomId}/streamPeerId`);
+    const unsub = onValue(sr, (snap) => {
+      if (!snap.exists() || !snap.val()) return;
+      const hostPeerId: string = snap.val();
+      if (hostPeerId === 'sharing' || !hostPeerId.startsWith('p_')) return;
+      // Guest: connect to host stream
+      try {
+        const peer = new (window as any).Peer();
+        peer.on('open', () => {
+          const call = peer.call(hostPeerId, null);
+          call.on('stream', (stream: MediaStream) => {
+            setRemoteStream(stream);
+            setIsViewingStream(true);
+          });
+          call.on('close', () => { setIsViewingStream(false); setRemoteStream(null); });
+        });
+        peerRef.current = peer;
+      } catch (e) { console.error('PeerJS guest error:', e); }
+    });
+    return () => { unsub(); if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; } };
+  }, [isPlaying, activeRoomId, peerJsLoaded, isSharing]);
+
+  // Start screen sharing (host flow)
+  const startSharing = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'browser' }, audio: false });
+      shareStreamRef.current = stream;
+      stream.getVideoTracks()[0].onended = () => stopSharing();
+
+      const peer = new (window as any).Peer();
+      peerRef.current = peer;
+      peer.on('open', (id: string) => {
+        if (activeRoomId) {
+          dbSet(ref(rtdb, `rooms/${activeRoomId}/streamPeerId`), id);
+          setIsSharing(true);
+        }
+      });
+      peer.on('call', (call: any) => {
+        call.answer(stream);
+        call.on('close', () => {});
+      });
+    } catch (e) { console.error('Share failed:', e); }
+  };
+
+  const stopSharing = () => {
+    if (shareStreamRef.current) { shareStreamRef.current.getTracks().forEach(t => t.stop()); shareStreamRef.current = null; }
+    if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; }
+    if (activeRoomId) dbSet(ref(rtdb, `rooms/${activeRoomId}/streamPeerId`), null);
+    setIsSharing(false);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => () => { stopSharing(); }, []);
+
+  // Set video source when remoteStream changes
+  useEffect(() => {
+    if (videoRef.current && remoteStream) {
+      videoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
 
   // Game session tracking
   useEffect(() => {
@@ -146,6 +228,16 @@ export function EmulatorView() {
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping mr-1" />
                   LATENCY: 12ms
                 </div>
+                <div className="w-[1px] h-3.5 bg-white/10" />
+                {!isViewingStream && (
+                  <button
+                    onClick={() => { playSelectSound(); isSharing ? stopSharing() : startSharing(); }}
+                    className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 cursor-pointer transition-all ${isSharing ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'}`}
+                  >
+                    {isSharing ? <StopCircle className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
+                    {isSharing ? 'Stop Stream' : 'Share Screen'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -242,10 +334,26 @@ export function EmulatorView() {
             </div>
           )}
 
-          {/* Core emulator frame load */}
+          {/* Guest stream receiver overlay */}
+          {isViewingStream && (
+            <div className="absolute inset-0 z-[180] bg-black flex flex-col">
+              <div className="absolute top-6 left-6 z-10">
+                <button onClick={() => { playNavigationSound(); stopPlaying(); }} className="bg-black/50 hover:bg-black/80 text-white backdrop-blur-md px-6 py-3 rounded-full text-xs font-bold flex items-center gap-2 border border-white/20 cursor-pointer">
+                  <ArrowLeft className="w-4 h-4" /> Leave Stream
+                </button>
+              </div>
+              <div className="absolute top-6 right-6 z-10 flex items-center gap-2 bg-black/60 text-emerald-400 px-4 py-2 rounded-full text-[10px] font-mono border border-emerald-500/30">
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                LIVE STREAM • P2 CONTROLLER ACTIVE
+              </div>
+              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
+            </div>
+          )}
+
+          {/* Core emulator frame load (hidden for guest viewing stream) */}
           <iframe 
             src={`/emulator.html?core=${playingCore || 'nes'}${gameUrl ? `&url=${encodeURIComponent(gameUrl)}` : ''}`}
-            className="w-full h-full border-none" 
+            className={`w-full h-full border-none ${isViewingStream ? 'hidden' : ''}`}
             sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"
             allow="gamepad; autoplay; fullscreen"
           />
