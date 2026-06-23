@@ -11,7 +11,7 @@ import {
   BookOpen, 
   Gamepad2
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAudio } from "../hooks/useAudio";
 
 export function GamepadPairingModal() {
@@ -31,13 +31,34 @@ export function GamepadPairingModal() {
   const { playSelectSound, playNavigationSound } = useAudio();
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<1|2|3|4>(1);
+  const [localIp, setLocalIp] = useState('');
+
+  // Detect local network IP for QR code (localhost won't work from phones)
+  useEffect(() => {
+    // Try to get local IP via RTCPeerConnection
+    try {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel('');
+      pc.createOffer().then(offer => pc.setLocalDescription(offer));
+      pc.onicecandidate = (ice) => {
+        if (!ice || !ice.candidate) return;
+        const ipMatch = ice.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+        if (ipMatch && ipMatch[1] !== '127.0.0.1') {
+          setLocalIp(ipMatch[1]);
+        }
+      };
+      setTimeout(() => pc.close(), 2000);
+    } catch (e) {}
+  }, []);
+
+  const baseUrl = localIp ? `http://${localIp}:3000` : window.location.origin;
 
   const codes = [controllerCode, controllerCodeP2, controllerCodeP3, controllerCodeP4];
   const connectedStates = [isControllerConnected, isControllerConnectedP2, isControllerConnectedP3, isControllerConnectedP4];
   const currentCode = codes[activeTab - 1] || controllerCode;
   const currentConnected = connectedStates[activeTab - 1] || false;
 
-  const controllerUrl = `${window.location.origin}/controller.html?code=${currentCode}`;
+  const controllerUrl = `${baseUrl}/controller.html?code=${currentCode}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=07070a&bgcolor=ffffff&data=${encodeURIComponent(controllerUrl)}`;
 
   const handleCopyLink = () => {
@@ -160,7 +181,7 @@ export function GamepadPairingModal() {
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
                   <div className="md:col-span-6 flex flex-col items-center">
                     <div className="bg-white p-3.5 rounded-2xl shadow-xl border border-white/10 hover:rotate-1 transition-transform duration-300">
-                      <img src={qrCodeUrl} alt="Gamepad Controller QR Sync Link" className="w-36 h-36 border-none" />
+                      <img key={qrCodeUrl} src={qrCodeUrl} alt="Gamepad Controller QR Sync Link" className="w-36 h-36 border-none" />
                     </div>
                     <span className="text-[9px] text-white/30 font-mono uppercase mt-2.5 tracking-wider flex items-center gap-1.5 leading-none">
                       <Zap className="w-3 h-3" style={{ color: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][activeTab-1] }} /> Scan QR to pair instantly
@@ -176,7 +197,7 @@ export function GamepadPairingModal() {
                     <div className="space-y-1.5">
                       <span className="text-[9px] text-white/40 font-mono uppercase font-black tracking-wider leading-none block">CONTROLLER LINK</span>
                       <div className="flex bg-black/40 border border-white/10 p-2.5 rounded-xl items-center justify-between gap-2">
-                        <span className="text-[10px] text-zinc-400 font-mono truncate select-all">{window.location.host}/controller</span>
+                        <span className="text-[10px] text-zinc-400 font-mono truncate select-all">{baseUrl.replace(/^https?:\/\//, '')}/controller</span>
                         <button onClick={handleCopyLink} className="text-white/50 hover:text-cyan-400 transition-all cursor-pointer">
                           {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                         </button>

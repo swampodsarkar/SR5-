@@ -21,8 +21,8 @@
     <div id="info" class="info"></div>
     <div id="game-container"></div>
     <script>
-        // Button map: button name -> standard gamepad button index
-        const MAP = { "UP": 12, "DOWN": 13, "LEFT": 14, "RIGHT": 15, "A": 1, "B": 0, "X": 3, "Y": 2, "SELECT": 8, "START": 9, "L1": 4, "R1": 5 };
+        // Button map: button name -> standard gamepad button index (Xbox layout: A=0, B=1, X=2, Y=3)
+        const MAP = { "UP": 12, "DOWN": 13, "LEFT": 14, "RIGHT": 15, "A": 0, "B": 1, "X": 2, "Y": 3, "SELECT": 8, "START": 9, "L1": 4, "R1": 5 };
 
         // 4 player button states
         const players = [{}, {}, {}, {}];
@@ -82,12 +82,41 @@
         if (url && url !== 'undefined' && url !== 'null') {
             if (url.startsWith('http')) {
                 const isGitHubRaw = url.includes('raw.githubusercontent.com') || url.includes('githubusercontent.com');
-                window.EJS_gameUrl = isGitHubRaw ? url : 'https://corsproxy.io/?url=' + encodeURIComponent(url);
+                if (isGitHubRaw) {
+                    window.EJS_gameUrl = url;
+                } else {
+                    // Try multiple CORS proxies
+                    const proxies = ['https://corsproxy.io/?url=', 'https://api.allorigins.win/raw?url=', 'https://corsproxy.vercel.app/api?url='];
+                    window.EJS_gameUrl = proxies[0] + encodeURIComponent(url);
+                    // Save the URL so React can retry with different proxies if this one fails
+                    window.__EJS_rawUrl = url;
+                    window.__EJS_proxies = proxies;
+                }
             } else {
                 window.EJS_gameUrl = url;
             }
             window.EJS_startOnLoaded = true;
         }
+
+        // Retry with next CORS proxy if the first fails
+        window.EJS_onGameStart = function() {
+            document.getElementById('info').innerText = '';
+        };
+        setTimeout(function checkLoad() {
+            const el = document.querySelector('.EJS_menu_player, .ejs_player');
+            if (el) {
+                const text = el.textContent || el.innerText || '';
+                if (text.includes('404') || text.includes('Error') || text.includes('Failed')) {
+                    if (window.__EJS_rawUrl && window.__EJS_proxies) {
+                        const idx = window.__EJS_proxies.indexOf(window.EJS_gameUrl.replace('?url=', '').replace('?url=', ''));
+                        if (idx >= 0 && idx < window.__EJS_proxies.length - 1) {
+                            window.EJS_gameUrl = window.__EJS_proxies[idx + 1] + encodeURIComponent(window.__EJS_rawUrl);
+                            location.reload();
+                        }
+                    }
+                }
+            }
+        }, 15000);
     </script>
     <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
 </body>
