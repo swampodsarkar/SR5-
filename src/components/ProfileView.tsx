@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, User, LogIn, Lock, Shield, UserX, Plus, Bell, Eye, EyeOff, Coins, Users, Gamepad2, PlaySquare, Send, MessageSquare, LogOut, Swords, ExternalLink, RefreshCw, Radio, UserCheck } from "lucide-react";
+import { X, User, LogIn, Lock, Shield, UserX, Plus, Bell, Eye, EyeOff, Coins, Users, Gamepad2, PlaySquare, Send, MessageSquare, LogOut, Swords, ExternalLink, RefreshCw, Radio, UserCheck, BarChart3, CalendarCheck, MonitorSmartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useUIStore } from "../store/uiStore";
 import { useAudio } from "../hooks/useAudio";
@@ -41,6 +41,12 @@ export function ProfileView() {
 
   // Firebase Realtime DB fetched values
   const [balance, setBalance] = useState<number>(0);
+  const [coinBalance, setCoinBalanceLocal] = useState<number>(0);
+  const [todayAds, setTodayAds] = useState(0);
+  const [adLoading, setAdLoading] = useState(false);
+  const [analyticsGames, setAnalyticsGames] = useState<any[]>([]);
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const [maintenanceMsg, setMaintenanceMsg] = useState('');
   const [isBanned, setIsBanned] = useState<boolean>(false);
   const [userProfileData, setUserProfileData] = useState<any>(null);
 
@@ -79,6 +85,16 @@ export function ProfileView() {
           if (snap.exists()) {
             setBalance(snap.val());
           }
+        });
+
+        // Sync coin balance
+        onValue(ref(rtdb, `users/${user.uid}/coins/balance`), (snap) => {
+          if (snap.exists()) setCoinBalanceLocal(snap.val());
+        });
+        // Sync daily ad count
+        const today = new Date().toDateString();
+        onValue(ref(rtdb, `users/${user.uid}/adWatched/${today}/count`), (snap) => {
+          if (snap.exists()) setTodayAds(snap.val());
         });
 
         // Sync personal ban state
@@ -251,6 +267,28 @@ export function ProfileView() {
       set(activeGameRef, "Idle");
     }
   }, [currentUser, isCurrentlyPlayingStoreValue]);
+  // Admin analytics + maintenance observer
+  useEffect(() => {
+    // Sync maintenance mode
+    onValue(ref(rtdb, 'system/maintenance'), (snap) => {
+      if (snap.exists()) {
+        const d = snap.val();
+        setIsMaintenanceMode(d.active || false);
+        setMaintenanceMsg(d.message || '');
+      }
+    });
+    // Sync analytics
+    onValue(ref(rtdb, 'analytics/games'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.val();
+        const arr = Object.entries(data).map(([id, v]: any) => ({ id, ...v }));
+        arr.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
+        setAnalyticsGames(arr);
+      } else {
+        setAnalyticsGames([]);
+      }
+    });
+  }, [isAdminUser]);
 
   // Admin statistics observer
   useEffect(() => {
@@ -898,7 +936,7 @@ export function ProfileView() {
                   </div>
                 </div>
 
-                {/* Balance Wallet top-up */}
+                  {/* Balance Wallet top-up */}
                 <div className="bg-white/[0.03] border border-white/10 rounded-3xl p-6">
                   <span className="text-xs text-white/40 block font-mono font-bold tracking-widest uppercase mb-1">CURRENT WALLET</span>
                   <div className="flex items-center gap-3 mb-6">
@@ -913,6 +951,39 @@ export function ProfileView() {
                     <Plus className="w-4 h-4" />
                     Add free $50.00 Wallet Funds
                   </button>
+                </div>
+
+                {/* Coin Balance + Daily Tasks */}
+                <div className="bg-white/[0.03] border border-white/10 rounded-3xl p-6 space-y-4">
+                  <span className="text-xs text-white/40 block font-mono font-bold tracking-widest uppercase mb-1">COINS & DAILY TASKS</span>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-yellow-500/10 rounded-xl text-yellow-400">
+                      <Coins className="w-5 h-5" />
+                    </div>
+                    <span className="text-2xl font-extrabold font-mono text-yellow-300">{coinBalance} 🪙</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-white/50">
+                      <span className="flex items-center gap-1"><CalendarCheck className="w-3 h-3" /> Ads watched today</span>
+                      <span className="font-mono text-white/70">{todayAds}/5</span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        setAdLoading(true);
+                        const { watchAdForCoins } = await import('../hooks/useGameSession');
+                        const ok = await watchAdForCoins();
+                        if (ok) {
+                          setCoinBalanceLocal(c => c + 2);
+                          setTodayAds(a => a + 1);
+                        }
+                        setAdLoading(false);
+                      }}
+                      disabled={adLoading || todayAds >= 5}
+                      className="w-full bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 text-yellow-300 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 disabled:opacity-30 cursor-pointer transition-all"
+                    >
+                      {adLoading ? 'Loading...' : todayAds >= 5 ? 'Max ads watched today' : '🎬 Watch Ad = +2 Coins'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Sign out */}
@@ -1264,6 +1335,60 @@ export function ProfileView() {
                         </table>
                       </div>
                     </div>
+
+                      {/* Analytics: Most Played Games */}
+                      <div className="bg-white/[0.03] border border-white/10 rounded-3xl p-6">
+                        <div className="flex items-center gap-2 text-white mb-4 border-b border-white/5 pb-3">
+                          <BarChart3 className="w-5 h-5 text-green-400" />
+                          <h3 className="font-semibold text-sm uppercase tracking-wider">Game Analytics</h3>
+                        </div>
+                        {analyticsGames.length === 0 ? (
+                          <p className="text-xs text-white/40">No game data yet. Play some games to see analytics here.</p>
+                        ) : (
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {analyticsGames.map((g, i) => (
+                              <div key={g.id} className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-mono text-white/30 w-5">{i + 1}.</span>
+                                  <span className="text-xs font-bold text-white">{g.title}</span>
+                                </div>
+                                <div className="flex gap-4 text-[10px] font-mono">
+                                  <span className="text-white/50">{g.playCount || 0} plays</span>
+                                  <span className="text-green-400/60">{((g.totalTime || 0) / 60).toFixed(1)}h</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Maintenance Mode Toggle */}
+                      <div className="bg-white/[0.03] border border-white/10 rounded-3xl p-6">
+                        <div className="flex items-center gap-2 text-white mb-4 border-b border-white/5 pb-3">
+                          <MonitorSmartphone className="w-5 h-5 text-red-400" />
+                          <h3 className="font-semibold text-sm uppercase tracking-wider">Maintenance Mode</h3>
+                        </div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-xs text-white/50">System Status</span>
+                          <button
+                            onClick={async () => {
+                              const newVal = !isMaintenanceMode;
+                              await set(ref(rtdb, 'system/maintenance'), newVal ? { active: true, message: maintenanceMsg || 'System under maintenance. Please check back later.' } : { active: false, message: '' });
+                              setIsMaintenanceMode(newVal);
+                            }}
+                            className={`px-4 py-1.5 rounded-full text-[10px] font-bold cursor-pointer transition-all ${isMaintenanceMode ? 'bg-red-600 text-white' : 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'}`}
+                          >
+                            {isMaintenanceMode ? '🟥 Active' : '🟩 Live'}
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={maintenanceMsg}
+                          onChange={(e) => setMaintenanceMsg(e.target.value)}
+                          placeholder="Maintenance message (optional)"
+                          className="w-full bg-white/5 border border-white/5 rounded-xl px-3 py-2 text-xs outline-none mt-2"
+                        />
+                      </div>
 
                   </div>
                 ) : (

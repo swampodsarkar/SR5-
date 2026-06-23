@@ -1,17 +1,67 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Gamepad, Wifi, MessageSquarePlus, Sparkles } from "lucide-react";
+import { ArrowLeft, Gamepad, Wifi, MessageSquarePlus, Sparkles, Eye, Clock, Coins } from "lucide-react";
 import { useUIStore } from "../store/uiStore";
 import { auth, rtdb } from "../lib/firebase";
-import { ref, onValue, push } from "firebase/database";
+import { ref, onValue, push, get, update } from "firebase/database";
 import { useAudio } from "../hooks/useAudio";
+import { trackGamePlay, checkRental, extendRentalWithAd, watchAdForCoins, checkParentalLimit } from "../hooks/useGameSession";
 
 export function EmulatorView() {
-  const { isPlaying, playingCore, gameUrl, stopPlaying, activeRoomId } = useUIStore();
+  const { isPlaying, playingCore, gameUrl, stopPlaying, activeRoomId, activeGameId, gamePlayStart, gamePlayStop } = useUIStore();
   const { playSelectSound, playNavigationSound } = useAudio();
+  const timerRef = useRef<any>(null);
+  const [rentalStatus, setRentalStatus] = useState<'owned' | 'rented_valid' | 'rented_expired' | 'none' | 'checking'>('checking');
+  const [showAdWall, setShowAdWall] = useState(false);
+  const [parentalBlocked, setParentalBlocked] = useState(false);
+  const [parentalDaily, setParentalDaily] = useState(0);
+  const [parentalMax, setParentalMax] = useState(999);
+  const [adCooldown, setAdCooldown] = useState(false);
+  const [sessionMinutes, setSessionMinutes] = useState(0);
   
   const [roomData, setRoomData] = useState<any>(null);
   const [gameChats, setGameChats] = useState<any[]>([]);
+
+  // Game session tracking
+  useEffect(() => {
+    if (!isPlaying || !activeGameId) return;
+
+    let cancelled = false;
+
+    checkRental(activeGameId).then((status) => {
+      if (cancelled) return;
+      setRentalStatus(status);
+      if (status === 'rented_expired') {
+        setShowAdWall(true);
+        return;
+      }
+      // Only start session if rental is valid
+      gamePlayStart(activeGameId);
+      timerRef.current = setInterval(() => {
+        setSessionMinutes((p) => p + 1);
+      }, 60000);
+    });
+
+    // Check parental controls
+    if (auth.currentUser) {
+      checkParentalLimit(auth.currentUser.uid).then((res) => {
+        if (cancelled) return;
+        setParentalDaily(res.dailyMinutes);
+        setParentalMax(res.maxMinutes);
+        if (res.blocked) setParentalBlocked(true);
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      if (timerRef.current) clearInterval(timerRef.current);
+      const mins = gamePlayStop();
+      if (mins > 0) {
+        trackGamePlay(activeGameId, mins);
+        // Analytics handled inside trackGamePlay
+      }
+    };
+  }, [isPlaying, activeGameId]);
 
   // Watch for active matchmaking and co-op chats while inside emulator
   useEffect(() => {
@@ -148,6 +198,45 @@ export function EmulatorView() {
                   className="px-2.5 py-1.5 bg-white/5 hover:bg-cyan-500 hover:text-zinc-950 text-white font-bold text-[10px] rounded-lg transition-all cursor-pointer"
                 >
                   Need backup!
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Rental expired / Ad-wall overlay */}
+          {showAdWall && (
+            <div className="absolute inset-0 z-[200] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center">
+              <div className="max-w-sm space-y-6">
+                <Clock className="w-16 h-16 text-amber-400 mx-auto" />
+                <h2 className="text-2xl font-bold text-white">Game Time Expired</h2>
+                <p className="text-white/60 text-sm">Your rental period for this game has ended. Watch a short ad to get 1 more hour of play time, or purchase the full game.</p>
+                <div className="flex flex-col gap-3 pt-2">
+                  <button onClick={async () => {
+                    setAdCooldown(true);
+                    if (activeGameId && await extendRentalWithAd(activeGameId)) {
+                      setShowAdWall(false); setRentalStatus('rented_valid');
+                    }
+                    setAdCooldown(false);
+                  }} disabled={adCooldown} className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-8 py-3 rounded-full text-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer">
+                    {adCooldown ? 'Loading...' : <>🎬 Watch Ad (1hr unlock)</>}
+                  </button>
+                  <button onClick={() => { playNavigationSound(); stopPlaying(); }} className="text-white/50 hover:text-white text-xs transition-colors cursor-pointer">
+                    Back to Console
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Parental control block overlay */}
+          {parentalBlocked && (
+            <div className="absolute inset-0 z-[200] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center">
+              <div className="max-w-sm space-y-6">
+                <Eye className="w-16 h-16 text-indigo-400 mx-auto" />
+                <h2 className="text-2xl font-bold text-white">Daily Play Limit Reached</h2>
+                <p className="text-white/60 text-sm">You've used {parentalDaily} of {parentalMax} minutes today. Parental controls are active.</p>
+                <button onClick={() => { playNavigationSound(); stopPlaying(); }} className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold px-8 py-3 rounded-full text-sm cursor-pointer">
+                  Back to Console
                 </button>
               </div>
             </div>

@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import { useUIStore } from "../store/uiStore";
 import { useAudio } from "../hooks/useAudio";
 import { auth, rtdb } from "../lib/firebase";
-import { ref, onValue, set as dbSet, push as dbPush, remove as dbRemove } from "firebase/database";
+import { ref, onValue, set as dbSet, push as dbPush, remove as dbRemove, update } from "firebase/database";
 
 const CATEGORIES = [
   { id: 'guide', label: "User's Guide, Health & Safety", icon: Book },
@@ -521,43 +521,98 @@ function CategoryContent({ categoryId, sysInfo }: { categoryId: string, sysInfo:
       );
 
     case 'family':
+      const [parentalEnabled, setParentalEnabled] = useState(false);
+      const [maxDailyMinutes, setMaxDailyMinutes] = useState(120);
+      const [parentalPinFirebase, setParentalPinFirebase] = useState("0000");
+      const [pinSaveSuccess, setPinSaveSuccess] = useState(false);
+
+      useEffect(() => {
+        if (!auth.currentUser) return;
+        const unsub = onValue(ref(rtdb, `users/${auth.currentUser.uid}/parentalControls`), (snap) => {
+          if (snap.exists()) {
+            const d = snap.val();
+            setParentalEnabled(d.enabled || false);
+            setMaxDailyMinutes(d.maxDailyMinutes || 120);
+            setParentalPinFirebase(d.pin || "0000");
+          }
+        });
+        return () => unsub();
+      }, []);
+
+      const saveParental = async (updates: Record<string, any>) => {
+        if (!auth.currentUser) return;
+        try {
+          await update(ref(rtdb, `users/${auth.currentUser.uid}/parentalControls`), updates);
+        } catch (e) { console.error('Parental save error', e); }
+      };
+
       return (
         <div className="space-y-6">
           <div className="mb-4 border-b border-white/10 pb-4 text-white/50 font-medium tracking-wide uppercase text-sm">Parental Protection</div>
-          
+
+          <ToggleRow
+            title="Parental Controls"
+            description="Restrict play time and require PIN for settings changes"
+            isOn={parentalEnabled}
+            onToggle={(v) => {
+              setParentalEnabled(v);
+              saveParental({ enabled: v });
+            }}
+          />
+
+          <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
+            <h5 className="text-lg font-medium">Play Time Limit (per day)</h5>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min={30}
+                max={480}
+                step={15}
+                value={maxDailyMinutes}
+                onChange={(e) => setMaxDailyMinutes(Number(e.target.value))}
+                onMouseUp={() => saveParental({ maxDailyMinutes })}
+                className="flex-1 accent-indigo-500"
+              />
+              <span className="text-xl font-bold font-mono text-indigo-300 w-16 text-right">{maxDailyMinutes}m</span>
+            </div>
+            <p className="text-white/40 text-xs">Set between 30 min and 8 hours per day.</p>
+          </div>
+
           <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
             <h5 className="text-lg font-medium">Console PIN Management</h5>
             <div className="flex gap-3 items-center">
               <input
                 type="password"
                 maxLength={4}
-                value={parentralPin}
+                value={parentalPinFirebase}
                 onChange={(e) => {
-                  setParentralPin(e.target.value);
-                  setPinChangeSuccess(false);
+                  setParentalPinFirebase(e.target.value);
+                  setPinSaveSuccess(false);
                 }}
                 className="bg-black/40 border border-white/10 px-4 py-3 rounded-xl text-center text-xl font-bold font-mono tracking-widest text-white w-28 focus:outline-none focus:border-white"
               />
-              <button 
-                onClick={() => { 
+              <button
+                onClick={() => {
                   playSelectSound();
-                  setPinChangeSuccess(true);
-                }} 
+                  saveParental({ pin: parentalPinFirebase });
+                  setPinSaveSuccess(true);
+                  setTimeout(() => setPinSaveSuccess(false), 2000);
+                }}
                 className="bg-white/10 hover:bg-white hover:text-black border border-white/15 px-5 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
               >
                 Change PIN
               </button>
-              {pinChangeSuccess && (
-                <motion.span 
-                  initial={{ opacity: 0, x: -5 }} 
-                  animate={{ opacity: 1, x: 0 }} 
+              {pinSaveSuccess && (
+                <motion.span
+                  initial={{ opacity: 0, x: -5 }}
+                  animate={{ opacity: 1, x: 0 }}
                   className="text-green-400 text-sm font-medium flex items-center gap-1 ml-2"
                 >
-                  <CheckCircle2 className="w-4 h-4" /> Passcode saved
+                  <CheckCircle2 className="w-4 h-4" /> PIN saved
                 </motion.span>
               )}
             </div>
-            <p className="text-white/40 text-xs leading-relaxed">Default protection passcode is 0000. Changes are written securely to system local storage.</p>
+            <p className="text-white/40 text-xs leading-relaxed">Default protection passcode is 0000. Used to override daily limits.</p>
           </div>
 
           <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">

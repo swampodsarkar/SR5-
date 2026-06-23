@@ -51,6 +51,36 @@ interface UIState {
   setControllerConnectedP3: (connected: boolean) => void;
   setControllerConnectedP4: (connected: boolean) => void;
   
+  // Game session tracking
+  gameSessionStart: number | null;
+  gamePlayStart: (gameId: string) => void;
+  gamePlayStop: () => number;
+
+  // Maintenance mode
+  isMaintenanceMode: boolean;
+  maintenanceMessage: string;
+
+  // Parental controls
+  parentalPin: string;
+  parentalMaxMinutes: number;
+  parentalEnabled: boolean;
+  setParentalPin: (pin: string) => void;
+  setParentalMaxMinutes: (m: number) => void;
+  setParentalEnabled: (e: boolean) => void;
+
+  // Coin system
+  coinBalance: number;
+  coinTotalEarned: number;
+  setCoins: (balance: number, totalEarned: number) => void;
+
+  // Rentals tracking
+  rentedGames: Record<string, { rentedAt: number; expiresAt: number }>;
+  setRentedGames: (rentals: Record<string, { rentedAt: number; expiresAt: number }>) => void;
+
+  // Daily ads watched count
+  todayAdCount: number;
+  setTodayAdCount: (count: number) => void;
+
   // Actions
   finishBooting: () => void;
   setControlCenterOpen: (isOpen: boolean) => void;
@@ -138,7 +168,17 @@ export const useUIStore = create<UIState>((set) => ({
     return code;
   })(),
   gamesList: MOckGames,
-  
+  gameSessionStart: null,
+  isMaintenanceMode: false,
+  maintenanceMessage: '',
+  parentalPin: localStorage.getItem('sys_parental_pin') || '',
+  parentalMaxMinutes: Number(localStorage.getItem('sys_parental_max')) || 120,
+  parentalEnabled: localStorage.getItem('sys_parental_enabled') === 'true',
+  coinBalance: 0,
+  coinTotalEarned: 0,
+  rentedGames: {},
+  todayAdCount: 0,
+
   // Initial values from localStorage or sensible defaults
   consoleName: localStorage.getItem('sys_console_name') || 'SR5 Console',
   userName: localStorage.getItem('sys_user_name') || 'MD Swampod Sarkar',
@@ -152,6 +192,19 @@ export const useUIStore = create<UIState>((set) => ({
   soundOn: localStorage.getItem('sys_sound_on') !== 'false',
   resolutionSetting: localStorage.getItem('sys_resolution') || 'Automatic (4K)',
   hdrEnabled: localStorage.getItem('sys_hdr') !== 'false',
+
+  gamePlayStart: (gameId) => set({ gameSessionStart: Date.now() }),
+  gamePlayStop: () => {
+    let elapsed = 0;
+    set((s) => { elapsed = s.gameSessionStart ? Math.round((Date.now() - s.gameSessionStart) / 60000) : 0; return { gameSessionStart: null }; });
+    return elapsed;
+  },
+  setParentalPin: (pin) => { localStorage.setItem('sys_parental_pin', pin); set({ parentalPin: pin }); },
+  setParentalMaxMinutes: (m) => { localStorage.setItem('sys_parental_max', String(m)); set({ parentalMaxMinutes: m }); },
+  setParentalEnabled: (e) => { localStorage.setItem('sys_parental_enabled', String(e)); set({ parentalEnabled: e }); },
+  setCoins: (balance, totalEarned) => set({ coinBalance: balance, coinTotalEarned: totalEarned }),
+  setRentedGames: (rentals) => set({ rentedGames: rentals }),
+  setTodayAdCount: (count) => set({ todayAdCount: count }),
 
   finishBooting: () => set({ isBooting: false }),
   setControlCenterOpen: (isOpen) => set({ isControlCenterOpen: isOpen }),

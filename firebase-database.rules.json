@@ -1,0 +1,124 @@
+{
+  "rules": {
+    ".read": "auth !== null && root.child('banned_users').child(auth.token.email.replace('.', '_')).val() !== true",
+    ".write": "auth !== null && root.child('banned_users').child(auth.token.email.replace('.', '_')).val() !== true",
+
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid",
+        "balance": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "purchased": {
+          "$gameId": { ".write": "$uid === auth.uid" }
+        },
+        "installed": {
+          "$gameId": { ".write": "$uid === auth.uid" }
+        },
+        "rentedGames": {
+          "$gameId": {
+            ".write": "$uid === auth.uid",
+            ".validate": "newData.child('expiresAt').isNumber()"
+          }
+        },
+        "coins": {
+          ".write": "$uid === auth.uid",
+          "balance": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "totalEarned": { ".validate": "newData.isNumber()" }
+        },
+        "parentalControls": {
+          ".write": "$uid === auth.uid"
+        },
+        "gameTime": {
+          "$gameId": {
+            ".write": "$uid === auth.uid",
+            "totalMinutes": { ".validate": "newData.isNumber()" }
+          }
+        },
+        "adWatched": {
+          "$date": {
+            "count": { ".validate": "newData.isNumber() && newData.val() <= 5" },
+            "lastWatched": { ".validate": "newData.isNumber()" }
+          }
+        },
+        "friends": {
+          "$friendUid": { ".write": "$uid === auth.uid" }
+        },
+        "friendRequests": {
+          "$senderUid": { ".write": "$senderUid === auth.uid || $uid === auth.uid" }
+        },
+        "email": { ".validate": "newData.isString()" },
+        "lastLogin": { ".validate": "newData.isString()" }
+      }
+    },
+
+    "games": {
+      ".read": "auth !== null",
+      ".write": "auth !== null && (auth.token.email === 'mdswampodsarkar@gmail.com' || auth.token.email === 'mdswampodsarkar007@gmail.com')",
+      "$gameId": {
+        ".validate": "newData.hasChildren(['title', 'core', 'romUrl'])"
+      }
+    },
+
+    "notifications": {
+      ".read": "auth !== null",
+      ".write": "auth !== null && (auth.token.email === 'mdswampodsarkar@gmail.com' || auth.token.email === 'mdswampodsarkar007@gmail.com')"
+    },
+
+    "system": {
+      ".read": "auth !== null",
+      "maintenance": {
+        ".write": "auth !== null && (auth.token.email === 'mdswampodsarkar@gmail.com' || auth.token.email === 'mdswampodsarkar007@gmail.com')"
+      }
+    },
+
+    "analytics": {
+      ".read": "auth !== null && (auth.token.email === 'mdswampodsarkar@gmail.com' || auth.token.email === 'mdswampodsarkar007@gmail.com')",
+      ".write": "auth !== null",
+      "games": {
+        "$gameId": {
+          "totalTime": { ".validate": "newData.isNumber()" },
+          "playCount": { ".validate": "newData.isNumber()" },
+          "lastPlayed": { ".validate": "newData.isNumber()" },
+          "title": { ".validate": "newData.isString()" }
+        }
+      }
+    },
+
+    "rooms": {
+      ".read": "auth !== null",
+      ".write": "auth !== null",
+      "$roomId": {
+        "host": { ".write": "newData.val() === auth.uid || data.val() === auth.uid" },
+        "players": {
+          "$playerId": { ".write": "$playerId === auth.uid" }
+        },
+        "chat": {
+          "$messageId": { ".write": "newData.child('senderUid').val() === auth.uid" }
+        }
+      }
+    },
+
+    "controllers": {
+      ".read": "auth !== null",
+      ".write": "auth !== null",
+      "$code": {
+        "inputs": {
+          ".write": "true",
+          ".read": "true"
+        }
+      }
+    },
+
+    "banned_users": {
+      ".read": "auth !== null",
+      ".write": "auth !== null && (auth.token.email === 'mdswampodsarkar@gmail.com' || auth.token.email === 'mdswampodsarkar007@gmail.com')"
+    },
+
+    "subscriptions": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    }
+  }
+}

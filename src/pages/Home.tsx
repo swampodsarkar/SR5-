@@ -15,17 +15,29 @@ import { useGamepad } from "../hooks/useGamepad";
 import { useMobileRemoteController } from "../hooks/useMobileRemoteController";
 import { useUIStore } from "../store/uiStore";
 import { auth, rtdb } from "../lib/firebase";
-import { ref, onChildAdded, limitToLast, query, set } from "firebase/database";
+import { ref, onChildAdded, onValue, limitToLast, query, set } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Bell, Gamepad2, UserPlus, Check, X, Sparkles } from "lucide-react";
+import { Shield, Bell, Gamepad2, UserPlus, Check, X, Sparkles, RefreshCw } from "lucide-react";
 
 export function Home() {
   useMobileRemoteController();
-  const { isControlCenterOpen, setControlCenterOpen, isSettingsOpen, isBooting, isBanned, isStoreOpen, isProfileOpen, setActiveRoomId, setProfileOpen } = useUIStore();
+  const { isControlCenterOpen, setControlCenterOpen, isSettingsOpen, isBooting, isBanned, isStoreOpen, isProfileOpen, setActiveRoomId, setProfileOpen, isMaintenanceMode, maintenanceMessage } = useUIStore();
   const { playNavigationSound, playSelectSound } = useAudio();
   const [activeNotifications, setActiveNotifications] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Listen for maintenance mode
+  useEffect(() => {
+    const maintRef = ref(rtdb, 'system/maintenance');
+    const unsub = onValue(maintRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.val();
+        useUIStore.getState().isMaintenanceMode !== data.enabled && useUIStore.setState({ isMaintenanceMode: data.enabled === true, maintenanceMessage: data.message || '' });
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Sync Auth User State
   useEffect(() => {
@@ -237,6 +249,27 @@ export function Home() {
       console.error(e);
     }
   };
+
+  // Maintenance mode gate
+  if (isMaintenanceMode) {
+    return (
+      <div className="w-screen h-screen bg-black flex flex-col justify-center items-center text-center p-8 z-[99999] relative text-white">
+        <div className="max-w-md space-y-6">
+          <div className="bg-amber-600/20 text-amber-500 border border-amber-500/30 p-4 rounded-3xl inline-block">
+            <Shield className="w-12 h-12" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-amber-500 font-mono">SYSTEM MAINTENANCE</h1>
+          <p className="text-white/60 text-sm leading-relaxed">{maintenanceMessage || 'The console is currently under maintenance. Please check back later.'}</p>
+          <div className="bg-white/5 border border-white/5 p-4 rounded-2xl font-mono text-xs text-white/50">
+            <div className="flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />
+              <span>SR5 CLOUD SERVICE • MAINTENANCE MODE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Secure locked Banned screen gate
   if (isBanned) {

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ShoppingBag, Download, Check, AlertCircle, Coins, Search, Sparkles, Play } from "lucide-react";
+import { X, ShoppingBag, Download, Check, AlertCircle, Coins, Search, Sparkles, Play, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useUIStore } from "../store/uiStore";
 import { useAudio } from "../hooks/useAudio";
@@ -7,6 +7,7 @@ import { auth, rtdb } from "../lib/firebase";
 import { ref, onValue, set, update, get } from "firebase/database";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { Game } from "../data/games";
+import { checkRental, extendRentalWithAd } from "../hooks/useGameSession";
 
 export interface StoreItem {
   id: string;
@@ -41,6 +42,7 @@ export function StoreView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [rentedIds, setRentedIds] = useState<Record<string, boolean>>({});
 
   // Track Firebase Auth state
   useEffect(() => {
@@ -76,6 +78,21 @@ export function StoreView() {
             setInstalledIds(Object.keys(snap.val()));
           } else {
             setInstalledIds([]);
+          }
+        });
+
+        // Sync rented games
+        const rentedRef = ref(rtdb, `users/${user.uid}/rentedGames`);
+        onValue(rentedRef, (snap) => {
+          if (snap.exists()) {
+            const rData = snap.val();
+            const valid: Record<string, boolean> = {};
+            Object.entries(rData).forEach(([gid, v]: any) => {
+              if (v.expiresAt > Date.now()) valid[gid] = true;
+            });
+            setRentedIds(valid);
+          } else {
+            setRentedIds({});
           }
         });
       } else {
@@ -160,6 +177,37 @@ export function StoreView() {
       }
     });
   }, [currentUser, dbItems]);
+
+  const handleRent = async (item: StoreItem) => {
+    playSelectSound();
+    if (!currentUser) {
+      setErrorMsg("Authentication required! Login from Profile first.");
+      setTimeout(() => setErrorMsg(""), 4000);
+      return;
+    }
+    const rentPrice = Math.max(1, Math.round(item.price * 0.1 * 100) / 100);
+    if (balance < rentPrice) {
+      setErrorMsg(`Insufficient balance. Rental costs $${rentPrice.toFixed(2)}.`);
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+    const ok = window.confirm(`Rent "${item.title}" for $${rentPrice.toFixed(2)} (2 days)?`);
+    if (!ok) return;
+    try {
+      await update(ref(rtdb), {
+        [`users/${currentUser.uid}/balance`]: Math.max(0, balance - rentPrice),
+        [`users/${currentUser.uid}/rentedGames/${item.id}`]: {
+          rentedAt: Date.now(),
+          expiresAt: Date.now() + 48 * 60 * 60 * 1000, // 2 days
+        },
+      });
+      setSuccessMsg(`Rented "${item.title}" for 2 days!`);
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (e: any) {
+      setErrorMsg(`Rental error: ${e.message}`);
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
 
   const handleBuy = async (item: StoreItem) => {
     playSelectSound();
@@ -444,21 +492,34 @@ export function StoreView() {
 
                         {/* Interactive Buttons */}
                         <div className="flex gap-2">
-                          {!isPurchased && !isDownloading ? (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleBuy(item)}
-                              className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-full font-medium text-sm transition-all shadow-md shadow-blue-500/10 flex items-center gap-2"
-                            >
-                              <ShoppingBag className="w-4 h-4" />
-                              {item.price === 0 ? "Get" : "Purchase"}
-                            </motion.button>
+                          {!isPurchased && !isDownloading && !rentedIds[item.id] ? (
+                            <>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => handleBuy(item)}
+                                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-full font-medium text-sm transition-all shadow-md shadow-blue-500/10 flex items-center gap-2"
+                              >
+                                <ShoppingBag className="w-4 h-4" />
+                                {item.price === 0 ? "Get" : "Buy"}
+                              </motion.button>
+                              {item.price > 0 && (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => handleRent(item)}
+                                  className="bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-full font-medium text-sm transition-all flex items-center gap-2"
+                                >
+                                  <Clock className="w-4 h-4" />
+                                  Rent
+                                </motion.button>
+                              )}
+                            </>
                           ) : (!isInstalled || isDownloading) ? (
                             <motion.button
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
-                              onClick={() => handleInstall(item, item.price === 0)}
+                              onClick={() => handleInstall(item, item.price === 0 || rentedIds[item.id])}
                               className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all flex items-center gap-2 ${
                                 isDownloading 
                                   ? "bg-slate-800 text-white cursor-not-allowed border border-white/10" 
