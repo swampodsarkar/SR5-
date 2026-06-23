@@ -32,7 +32,7 @@ export function GamepadPairingModal() {
   const currentCode = activeTab === 1 ? controllerCode : controllerCodeP2;
   const currentConnected = activeTab === 1 ? isControllerConnected : isControllerConnectedP2;
 
-  const controllerUrl = `${window.location.origin}/controller?code=${currentCode}`;
+  const controllerUrl = `${window.location.origin}/controller.html?code=${currentCode}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=07070a&bgcolor=ffffff&data=${encodeURIComponent(controllerUrl)}`;
 
   const handleCopyLink = () => {

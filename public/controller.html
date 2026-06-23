@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <title>SR5 Controller</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
+  </script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { background: #07070a; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; height: 100dvh; touch-action: none; user-select: none; }
+
+    .container { height: 100dvh; display: flex; flex-direction: column; max-width: 500px; margin: 0 auto; padding: 12px; }
+
+    /* header */
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.connected { background: #34d399; box-shadow: 0 0 8px #34d399; }
+    .dot.disconnected { background: #ef4444; }
+    .code { font-family: monospace; font-size: 12px; color: #00ffcc; letter-spacing: 2px; }
+    .latency { font-size: 10px; color: #666; font-family: monospace; }
+    .toggles { display: flex; gap: 6px; }
+    .toggles button { background: #1a1a24; border: 1px solid #ffffff15; color: #00ffcc; width: 34px; height: 34px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+    .toggles button.off { color: #ef444460; }
+
+    /* d-pad area */
+    .pad-area { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; }
+
+    .dpad { position: relative; width: 180px; height: 180px; background: #111118; border-radius: 50%; border: 3px solid #000; box-shadow: 0 8px 32px #00000080, inset 0 2px 4px #ffffff08; }
+    .dpad-center { position: absolute; inset: 24px; border-radius: 50%; background: #0a0a0f; border: 1px solid #ffffff08; }
+    .dpad-btn { position: absolute; background: #1a1a24; border: none; color: #ffffff40; font-size: 14px; cursor: pointer; transition: all 80ms; display: flex; align-items: center; justify-content: center; }
+    .dpad-btn:active, .dpad-btn.active { background: #00ffcc20; color: #00ffcc; box-shadow: 0 0 12px #00ffcc30; }
+    .dpad-up { top: 0; left: 50%; transform: translateX(-50%); width: 70px; height: 44px; border-radius: 0 0 8px 8px; }
+    .dpad-down { bottom: 0; left: 50%; transform: translateX(-50%); width: 70px; height: 44px; border-radius: 8px 8px 0 0; }
+    .dpad-left { left: 0; top: 50%; transform: translateY(-50%); width: 44px; height: 70px; border-radius: 0 8px 8px 0; }
+    .dpad-right { right: 0; top: 50%; transform: translateY(-50%); width: 44px; height: 70px; border-radius: 8px 0 0 8px; }
+
+    /* shoulder buttons */
+    .shoulders { display: flex; gap: 12px; width: 100%; max-width: 300px; }
+    .shoulders button { flex: 1; padding: 10px; background: #1a1a24; border: 1px solid #ffffff08; border-radius: 10px; color: #ffffff60; font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 80ms; }
+    .shoulders button:active, .shoulders button.active { background: #6366f1; color: #fff; transform: scale(0.95); box-shadow: 0 0 12px #6366f150; }
+
+    /* action buttons */
+    .actions { position: relative; width: 220px; height: 180px; display: flex; align-items: center; justify-content: center; }
+    .action-btn { position: absolute; width: 52px; height: 52px; border-radius: 50%; border: 2px solid #ffffff15; font-size: 18px; font-weight: 800; cursor: pointer; transition: all 80ms; display: flex; align-items: center; justify-content: center; }
+    .action-btn:active, .action-btn.active { transform: scale(0.9); }
+    .btn-y { top: 0; left: 50%; transform: translateX(-50%); background: #1a1a24; color: #10b981; }
+    .btn-y:active, .btn-y.active { background: #10b981; color: #000; box-shadow: 0 0 12px #10b98150; }
+    .btn-x { right: 0; top: 50%; transform: translateY(-50%); background: #1a1a24; color: #3b82f6; }
+    .btn-x:active, .btn-x.active { background: #3b82f6; color: #000; box-shadow: 0 0 12px #3b82f650; }
+    .btn-b { left: 0; top: 50%; transform: translateY(-50%); background: #1a1a24; color: #f59e0b; }
+    .btn-b:active, .btn-b.active { background: #f59e0b; color: #000; box-shadow: 0 0 12px #f59e0b50; }
+    .btn-a { bottom: 0; left: 50%; transform: translateX(-50%); background: #1a1a24; color: #ef4444; }
+    .btn-a:active, .btn-a.active { background: #ef4444; color: #000; box-shadow: 0 0 12px #ef444450; }
+
+    /* bottom row */
+    .bottom-row { display: flex; justify-content: center; gap: 32px; padding: 12px 0; }
+    .pill { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .pill button { width: 56px; height: 22px; border-radius: 20px; background: linear-gradient(180deg,#1a1a24,#0d0d14); border: 1px solid #ffffff08; cursor: pointer; transition: all 80ms; }
+    .pill button:active, .pill button.active { background: linear-gradient(180deg,#cbd5e1,#94a3b8); transform: scale(0.95); }
+    .pill span { font-size: 8px; color: #ffffff60; font-family: monospace; letter-spacing: 2px; font-weight: 700; }
+
+    /* pairing screen */
+    .pairing { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; text-align: center; padding: 24px; }
+    .pairing h1 { font-size: 18px; font-weight: 800; letter-spacing: 2px; }
+    .pairing p { font-size: 12px; color: #ffffff60; }
+    .pairing input { background: #0a0a0f; border: 1px solid #ffffff15; color: #00ffcc; font-size: 24px; letter-spacing: 8px; text-align: center; padding: 12px 16px; border-radius: 12px; width: 200px; font-family: monospace; text-transform: uppercase; outline: none; }
+    .pairing input:focus { border-color: #00ffcc60; }
+    .pairing button { background: #00ffcc; color: #000; border: none; padding: 12px 28px; border-radius: 12px; font-weight: 800; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; width: 200px; }
+    .pairing button:disabled { background: #1a1a24; color: #444; cursor: not-allowed; }
+
+    .error { color: #ef4444; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="container" id="app"></div>
+  <script>
+    // Firebase config (same as your app)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeoScw5UK53ElBnNdhtJVAETb3_isOEKs",
+      authDomain: "fram-and-go.firebaseapp.com",
+      databaseURL: "https://fram-and-go-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "fram-and-go",
+      storageBucket: "fram-and-go.firebasestorage.app",
+      messagingSenderId: "781295119002",
+      appId: "1:781295119002:web:4be2d54934395b491c0d23",
+      measurementId: "G-TKPPF986Z0"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ── state ──
+    let code = '';
+    let connected = false;
+    let pressed = {};
+    let soundOn = true;
+    let vibOn = true;
+
+    // ── audio ──
+    let audioCtx = null;
+    function playClick() {
+      if (!soundOn) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(150, audioCtx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.04);
+        g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + 0.04);
+      } catch (e) { /* ignore */ }
+    }
+
+    // ── vibration ──
+    function vibrate() { if (vibOn && navigator.vibrate) navigator.vibrate(20); }
+
+    // ── firebase helpers ──
+    function sendButton(btn, state) {
+      if (!code || !connected) return;
+      const updates = {};
+      updates[`controllers/${code}/state/${btn}`] = state;
+      updates[`controllers/${code}/state/lastUpdated`] = Date.now();
+      db.ref().update(updates).catch(() => {});
+    }
+
+    function press(btn) {
+      if (pressed[btn]) return;
+      pressed[btn] = true;
+      playClick();
+      vibrate();
+      sendButton(btn, 'down');
+      render();
+    }
+
+    function release(btn) {
+      if (!pressed[btn]) return;
+      pressed[btn] = false;
+      sendButton(btn, 'up');
+      render();
+    }
+
+    // ── touch handler factory ──
+    function touchProps(btn) {
+      return {
+        onPointerDown(e) { e.preventDefault(); press(btn); },
+        onPointerUp(e) { e.preventDefault(); release(btn); },
+        onPointerLeave(e) { e.preventDefault(); release(btn); },
+        onPointerCancel(e) { release(btn); }
+      };
+    }
+
+    // ── connect ──
+    function connect(targetCode) {
+      code = targetCode.toUpperCase();
+      const connectedRef = db.ref(`controllers/${code}/connected`);
+      const stateRef = db.ref(`controllers/${code}/state`);
+
+      // reset state
+      const init = {};
+      ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'].forEach(k => init[k] = 'up');
+      init.lastUpdated = Date.now();
+      stateRef.set(init).then(() => {
+        connectedRef.set(true);
+        connected = true;
+        render();
+
+        // latency ping
+        const pingRef = db.ref(`controllers/${code}/ping`);
+        setInterval(() => {
+          const start = Date.now();
+          pingRef.set(start).then(() => {
+            document.getElementById('latency').textContent = (Date.now() - start) + 'ms';
+          });
+        }, 5000);
+      }).catch(() => { render(); });
+    }
+
+    function disconnect() {
+      if (code) {
+        db.ref(`controllers/${code}/connected`).set(null);
+        db.ref(`controllers/${code}/state`).set(null);
+      }
+      connected = false;
+      code = '';
+      pressed = {};
+      history.replaceState(null, '', '/controller.html');
+      render();
+    }
+
+    // ── ui ──
+    function render() {
+      const app = document.getElementById('app');
+
+      if (!connected) {
+        app.innerHTML = `
+          <div class="pairing">
+            <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 8px 24px #6366f140">🎮</div>
+            <h1>SR5 Remote<br>Gamepad</h1>
+            <p style="font-family:monospace;font-size:10px;color:#ffffff40;letter-spacing:2px">NET_PROTOCOL v1.0</p>
+            <input type="text" maxlength="6" id="codeInput" placeholder="ABC123" value="${code}" oninput="this.value=this.value.toUpperCase()">
+            <button id="connectBtn">Connect</button>
+            <p style="font-size:10px;color:#ffffff30">Scan QR on SR5 Console → Home → Smartphone icon</p>
+          </div>
+        `;
+        document.getElementById('connectBtn').onclick = () => {
+          const val = document.getElementById('codeInput').value;
+          if (val.length === 6) connect(val);
+        };
+        document.getElementById('codeInput').onkeydown = (e) => {
+          if (e.key === 'Enter') {
+            const val = e.target.value;
+            if (val.length === 6) connect(val);
+          }
+        };
+        return;
+      }
+
+      // connected UI
+      app.innerHTML = `
+        <div class="header">
+          <div class="status">
+            <span class="dot connected" style="animation:pulse 2s infinite"></span>
+            <span style="font-size:11px;font-weight:600">P1 SYNCED</span>
+            <span class="code">${code}</span>
+            <span class="latency" id="latency">OK</span>
+          </div>
+          <div class="toggles">
+            <button id="soundBtn" class="${soundOn?'':'off'}">🔊</button>
+            <button id="vibBtn" class="${vibOn?'':'off'}">📳</button>
+            <button id="disconnectBtn" style="color:#ef4444">⏻</button>
+          </div>
+        </div>
+
+        <div class="pad-area">
+          <div class="shoulders">
+            <button id="L1" class="${pressed['L1']?'active':''}">L1</button>
+            <button id="R1" class="${pressed['R1']?'active':''}">R1</button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:24px;width:100%;justify-content:center">
+            <div class="dpad">
+              <div class="dpad-center"></div>
+              <button class="dpad-btn dpad-up" id="UP">▲</button>
+              <button class="dpad-btn dpad-down" id="DOWN">▼</button>
+              <button class="dpad-btn dpad-left" id="LEFT">◀</button>
+              <button class="dpad-btn dpad-right" id="RIGHT">▶</button>
+            </div>
+
+            <div class="actions">
+              <button class="action-btn btn-y" id="Y">Y</button>
+              <button class="action-btn btn-x" id="X">X</button>
+              <button class="action-btn btn-b" id="B">B</button>
+              <button class="action-btn btn-a" id="A">A</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-row">
+          <div class="pill">
+            <button id="SELECT" class="${pressed['SELECT']?'active':''}"></button>
+            <span>SELECT</span>
+          </div>
+          <div class="pill">
+            <button id="START" class="${pressed['START']?'active':''}"></button>
+            <span>START</span>
+          </div>
+        </div>
+      `;
+
+      // attach events
+      const btns = ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'];
+      btns.forEach(b => {
+        const el = document.getElementById(b);
+        if (el) Object.assign(el, touchProps(b));
+      });
+
+      document.getElementById('soundBtn').onclick = () => { soundOn = !soundOn; render(); };
+      document.getElementById('vibBtn').onclick = () => { vibOn = !vibOn; render(); };
+      document.getElementById('disconnectBtn').onclick = disconnect;
+    }
+
+    // ── auto-connect from URL param ──
+    const params = new URLSearchParams(location.search);
+    const urlCode = params.get('code');
+    if (urlCode && urlCode.length === 6) {
+      connect(urlCode);
+    } else {
+      render();
+    }
+
+    // ── handle back button ──
+    window.addEventListener('popstate', () => { if (connected) disconnect(); });
+  </script>
+</body>
+</html>
