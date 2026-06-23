@@ -1,0 +1,8 @@
+{
+  "name": "SR5 UI Clone",
+  "description": "A web-based recreation of the SR5 user interface featuring a 3D animated background, smooth framer-motion transitions, gamepad support, and glassmorphic elements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user network profile details and console wallet ledger details.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "User's unique identification ID"
+        },
+        "email": {
+          "type": "string",
+          "description": "User account registration email"
+        },
+        "balance": {
+          "type": "number",
+          "description": "Console wallet funds in USD"
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "ISO timestamp of the most recent console login session"
+        }
+      },
+      "required": ["uid", "email"]
+    },
+    "Game": {
+      "title": "Custom Store Game Cartridge",
+      "description": "Represents classic emulator games added dynamically by administrators.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Game display title"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Dynamic game subtitle / tag lines"
+        },
+        "core": {
+          "type": "string",
+          "description": "Emulator system core type (nes, snes, gba, gbc, segaMD, nds)"
+        },
+        "price": {
+          "type": "number",
+          "description": "Price tag values for purchasing"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Lucide icon key"
+        },
+        "wallpaper": {
+          "type": "string",
+          "description": "Gradient wallpaper string"
+        },
+        "themeColor": {
+          "type": "string",
+          "description": "Primary visual color hexadecimal code"
+        },
+        "romUrl": {
+          "type": "string",
+          "description": "HTTPS binary package file download path"
+        }
+      },
+      "required": ["title", "core", "romUrl"]
+    },
+    "Notification": {
+      "title": "System Alert Notification",
+      "description": "Global administration alert broadcasts synced inside the console in real-time.",
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "System warning message string"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Human localized message timestamp"
+        },
+        "type": {
+          "type": "string",
+          "description": "Category of alert toast"
+        }
+      },
+      "required": ["message", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User account profile records."
+    },
+    "games/{gameId}": {
+      "schema": "Game",
+      "description": "Custom retro game products dynamically available for download."
+    },
+    "notifications/{notifId}": {
+      "schema": "Notification",
+      "description": "Broadcast alerts pushed by admins."
+    }
+  }
+}

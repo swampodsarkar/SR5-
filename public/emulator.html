@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        #game-container { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .info { position: absolute; top: 20px; right: 20px; color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 8px; font-size: 13px; z-index: 9999; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
+    </style>
+    <script>
+      // Disable Context Menu
+      document.addEventListener('contextmenu', event => event.preventDefault());
+
+      // Disable DevTools shortcuts
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'F12' || e.keyCode === 123) { e.preventDefault(); }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) { e.preventDefault(); }
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'U' || e.key === 'u' || e.key === 'S' || e.key === 's')) { e.preventDefault(); }
+      });
+    </script>
+</head>
+<body>
+    <div id="info" class="info"></div>
+    <div id="game-container"></div>
+    <script>
+        // P1 & P2 State from parent React app (Mobile Gamepads)
+        const STs = [{}, {}];
+        const MAP = { "UP": 12, "DOWN": 13, "LEFT": 14, "RIGHT": 15, "A": 1, "B": 0, "X": 3, "Y": 2, "SELECT": 8, "START": 9, "L1": 4, "R1": 5 };
+
+        function getFakeGamepads() {
+           let arr = [null, null, null, null];
+           for(let i=0; i<2; i++) {
+              if (Object.keys(STs[i]).length > 0) {
+                 let btns = [];
+                 for(let b=0; b<18; b++) btns.push({ pressed: false, value: 0 });
+                 for(let k in STs[i]) {
+                    if(MAP[k] !== undefined) {
+                       btns[MAP[k]].pressed = STs[i][k] === 'down';
+                       btns[MAP[k]].value = STs[i][k] === 'down' ? 1.0 : 0;
+                    }
+                 }
+                 arr[i] = {
+                    id: "Virtual Mobile Gamepad P" + (i+1),
+                    index: i,
+                    connected: true,
+                    timestamp: performance.now(),
+                    mapping: "standard",
+                    axes: [0,0,0,0],
+                    buttons: btns
+                 };
+              }
+           }
+           return arr;
+        }
+
+        const origGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : () => [null,null,null,null];
+        navigator.getGamepads = function() {
+            const real = origGetGamepads() || [null,null,null,null];
+            const fake = getFakeGamepads();
+            return [
+                fake[0] || real[0] || null, 
+                fake[1] || real[1] || null, 
+                real[2] || null, 
+                real[3] || null
+            ];
+        };
+
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.type === 'GAMEPAD_UPDATE') {
+                STs[e.data.player][e.data.button] = e.data.state;
+            }
+        });
+
+        // Make fetch writable to avoid EmulatorJS loader crash
+        try {
+            let originalFetch = window.fetch;
+            Object.defineProperty(window, 'fetch', {
+                configurable: true,
+                get: function() { return originalFetch; },
+                set: function(val) { originalFetch = val; }
+            });
+        } catch(e) {}
+
+        const params = new URLSearchParams(window.location.search);
+        const core = params.get('core') || 'nes';
+        const url = params.get('url') || '';
+        
+        document.getElementById('info').innerText = `Load any ${core.toUpperCase()} ROM using the emulator interface`;
+
+        window.EJS_player = '#game-container';
+        window.EJS_core = core;
+        window.EJS_pathtodata = 'https://cdn.jsdelivr.net/gh/EmulatorJS/EmulatorJS@v4.2.1/data/';
+        window.EJS_color = '#ffffff';
+        
+        // Fix GitHub raw links to load without CORS proxy
+        if (url && url !== 'undefined' && url !== 'null') {
+          if (url.startsWith('http')) {
+            // GitHub raw URLs already support CORS — use directly
+            // Proxy is only needed for non-GitHub URLs
+            const isGitHubRaw = url.includes('raw.githubusercontent.com') || url.includes('githubusercontent.com');
+            if (isGitHubRaw) {
+              // Fetch via XHR to ensure binary data integrity, then create blob URL
+              var xhr = new XMLHttpRequest();
+              xhr.open('GET', url, true);
+              xhr.responseType = 'arraybuffer';
+              xhr.onload = function() {
+                if (xhr.status === 200) {
+                  var blob = new Blob([xhr.response], { type: 'application/octet-stream' });
+                  var blobUrl = URL.createObjectURL(blob);
+                  window.EJS_gameUrl = blobUrl;
+                  window.EJS_startOnLoaded = true;
+                  // Auto-start the emulator
+                  if (window.EJS_emulator && window.EJS_emulator.startGame) {
+                    window.EJS_emulator.startGame(blobUrl);
+                  }
+                } else {
+                  document.getElementById('info').innerText = 'Failed to load ROM (HTTP ' + xhr.status + ')';
+                }
+              };
+              xhr.onerror = function() {
+                document.getElementById('info').innerText = 'Network error loading ROM';
+              };
+              xhr.send();
+            } else {
+              // Non-GitHub URLs: use corsproxy.io as a more reliable proxy
+              window.EJS_gameUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
+              window.EJS_startOnLoaded = true;
+            }
+          } else {
+            window.EJS_gameUrl = url;
+            window.EJS_startOnLoaded = true;
+          }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/gh/EmulatorJS/EmulatorJS@v4.2.1/data/loader.js"></script>
+</body>
+</html>
