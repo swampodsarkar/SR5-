@@ -20,17 +20,22 @@ export function GamepadPairingModal() {
     setPairingOpen, 
     controllerCode, 
     controllerCodeP2,
+    controllerCodeP3,
+    controllerCodeP4,
     isControllerConnected,
-    isControllerConnectedP2
+    isControllerConnectedP2,
+    isControllerConnectedP3,
+    isControllerConnectedP4
   } = useUIStore();
 
   const { playSelectSound, playNavigationSound } = useAudio();
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<1|2>(1);
+  const [activeTab, setActiveTab] = useState<1|2|3|4>(1);
 
-  // Derive the active controller URL
-  const currentCode = activeTab === 1 ? controllerCode : controllerCodeP2;
-  const currentConnected = activeTab === 1 ? isControllerConnected : isControllerConnectedP2;
+  const codes = [controllerCode, controllerCodeP2, controllerCodeP3, controllerCodeP4];
+  const connectedStates = [isControllerConnected, isControllerConnectedP2, isControllerConnectedP3, isControllerConnectedP4];
+  const currentCode = codes[activeTab - 1] || controllerCode;
+  const currentConnected = connectedStates[activeTab - 1] || false;
 
   const controllerUrl = `${window.location.origin}/controller.html?code=${currentCode}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=07070a&bgcolor=ffffff&data=${encodeURIComponent(controllerUrl)}`;
@@ -92,41 +97,43 @@ export function GamepadPairingModal() {
             </div>
 
             {/* PLAYER TABS */}
-            <div className="flex gap-2">
-               <button 
-                  onClick={() => { playSelectSound(); setActiveTab(1); }}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase transition-colors border ${activeTab === 1 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
-               >
-                  Player 1 {isControllerConnected && " (Connected)"}
-               </button>
-               <button 
-                  onClick={() => { playSelectSound(); setActiveTab(2); }}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase transition-colors border ${activeTab === 2 ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
-               >
-                  Player 2 {isControllerConnectedP2 && " (Connected)"}
-               </button>
+            <div className="grid grid-cols-4 gap-1.5">
+               {[
+                 { n: 1, color: 'cyan', label: 'P1', connected: isControllerConnected },
+                 { n: 2, color: 'purple', label: 'P2', connected: isControllerConnectedP2 },
+                 { n: 3, color: 'amber', label: 'P3', connected: isControllerConnectedP3 },
+                 { n: 4, color: 'red', label: 'P4', connected: isControllerConnectedP4 },
+               ].map(({ n, color, label, connected }) => (
+                 <button key={n}
+                   onClick={() => { playSelectSound(); setActiveTab(n as any); }}
+                   className={`py-2 rounded-xl text-[10px] font-bold uppercase transition-colors border ${
+                     activeTab === n
+                       ? `bg-${color}-500/20 border-${color}-500/50 text-${color}-400`
+                       : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                   }`}
+                 >
+                   {label} {connected && "✓"}
+                 </button>
+               ))}
             </div>
 
-            {/* DYNAMIC RETRO-STYLE PAIRING CORE DISPLAY */}
             {currentConnected ? (
-              /* IF CONTROLLER CONNECTED: SUCCESS CORE STATE */
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className={`${activeTab === 1 ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-purple-500/10 border-purple-500/30'} border p-8 rounded-2xl text-center space-y-4 shadow-xl`}
+                className={`border p-8 rounded-2xl text-center space-y-4 shadow-xl`}
+                style={{ backgroundColor: ['rgba(6,182,212,0.1)','rgba(168,85,247,0.1)','rgba(245,158,11,0.1)','rgba(239,68,68,0.1)'][activeTab-1], borderColor: ['rgba(6,182,212,0.3)','rgba(168,85,247,0.3)','rgba(245,158,11,0.3)','rgba(239,68,68,0.3)'][activeTab-1] }}
               >
-                <div className={`w-16 h-16 ${activeTab === 1 ? 'bg-cyan-500/20 border-cyan-400/30' : 'bg-purple-500/20 border-purple-400/30'} border rounded-full flex items-center justify-center mx-auto shadow-inner`}>
-                  <Wifi className={`w-8 h-8 ${activeTab === 1 ? 'text-cyan-400' : 'text-purple-400'} animate-bounce`} />
+                <div className="w-16 h-16 border rounded-full flex items-center justify-center mx-auto shadow-inner"
+                  style={{ backgroundColor: [`rgba(6,182,212,0.2)`,`rgba(168,85,247,0.2)`,`rgba(245,158,11,0.2)`,`rgba(239,68,68,0.2)`][activeTab-1], borderColor: [`rgba(6,182,212,0.3)`,`rgba(168,85,247,0.3)`,`rgba(245,158,11,0.3)`,`rgba(239,68,68,0.3)`][activeTab-1] }}>
+                  <Wifi className="w-8 h-8 animate-bounce" style={{ color: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][activeTab-1] }} />
                 </div>
                 <div className="space-y-1">
-                  <h4 className={`text-sm font-bold ${activeTab === 1 ? 'text-cyan-400' : 'text-purple-400'} uppercase tracking-widest font-mono`}>
+                  <h4 className="text-sm font-bold uppercase tracking-widest font-mono" style={{ color: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][activeTab-1] }}>
                     P{activeTab} LINK ACTIVE
                   </h4>
-                  <p className="text-xs text-white/70">
-                    Controller sync established successfully. You can now use this controller in co-op games!
-                  </p>
+                  <p className="text-xs text-white/70">Controller sync established. You can use this controller in co-op games!</p>
                 </div>
-                
                 <div className="flex justify-center items-center gap-6 pt-2 font-mono">
                   <div className="text-center">
                     <span className="text-[10px] text-white/40 block">LATENCY</span>
@@ -134,79 +141,57 @@ export function GamepadPairingModal() {
                   </div>
                   <div className="w-[1px] h-6 bg-white/10" />
                   <div className="text-center">
-                    <span className="text-[10px] text-white/40 block">SLOT_ASSIGN</span>
-                    <span className="text-xs font-bold text-white">PLAYER_{activeTab}_GP</span>
+                    <span className="text-[10px] text-white/40 block">PLAYER</span>
+                    <span className="text-xs font-bold text-white">#{activeTab}</span>
                   </div>
                 </div>
-
                 <div className="pt-4">
                   <button
                     onClick={() => { playNavigationSound(); setPairingOpen(false); }}
-                    className={`${activeTab === 1 ? 'bg-cyan-500 hover:bg-cyan-400' : 'bg-purple-500 hover:bg-purple-400'} text-black font-extrabold text-xs px-6 py-2.5 rounded-xl uppercase tracking-wider cursor-pointer shadow-md`}
+                    className="text-black font-extrabold text-xs px-6 py-2.5 rounded-xl uppercase tracking-wider cursor-pointer shadow-md"
+                    style={{ background: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][activeTab-1] }}
                   >
                     Return to system
                   </button>
                 </div>
               </motion.div>
             ) : (
-              /* IF DISCONNECTED: DISPLAY QR CODE AND CODE INPUT DETAILS */
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                  
-                  {/* Left Column: QR Code Display Frame */}
                   <div className="md:col-span-6 flex flex-col items-center">
                     <div className="bg-white p-3.5 rounded-2xl shadow-xl border border-white/10 hover:rotate-1 transition-transform duration-300">
-                      <img 
-                        src={qrCodeUrl} 
-                        alt="Gamepad Controller QR Sync Link" 
-                        className="w-36 h-36 border-none"
-                      />
+                      <img src={qrCodeUrl} alt="Gamepad Controller QR Sync Link" className="w-36 h-36 border-none" />
                     </div>
                     <span className="text-[9px] text-white/30 font-mono uppercase mt-2.5 tracking-wider flex items-center gap-1.5 leading-none">
-                      <Zap className="w-3 h-3 text-cyan-400" /> Scan QR to pair instantly
+                      <Zap className="w-3 h-3" style={{ color: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][activeTab-1] }} /> Scan QR to pair instantly
                     </span>
                   </div>
-
-                  {/* Right Column: Connection Details / Code */}
                   <div className="md:col-span-6 space-y-4">
                     <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 shadow-inner">
-                      <span className="text-[9px] text-white/40 font-mono uppercase font-black tracking-widest leading-none">
-                        MANUAL SYNC CODE
-                      </span>
-                      <span className="text-2xl font-black font-mono tracking-widest text-cyan-400 py-1 uppercase select-all">
+                      <span className="text-[9px] text-white/40 font-mono uppercase font-black tracking-widest leading-none">MANUAL SYNC CODE</span>
+                      <span className="text-2xl font-black font-mono tracking-widest py-1 uppercase select-all" style={{ color: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][activeTab-1] }}>
                         {currentCode.slice(0,3)} {currentCode.slice(3)}
                       </span>
                     </div>
-
                     <div className="space-y-1.5">
-                      <span className="text-[9px] text-white/40 font-mono uppercase font-black tracking-wider leading-none block">
-                        WEB CONTROLLER LINK
-                      </span>
+                      <span className="text-[9px] text-white/40 font-mono uppercase font-black tracking-wider leading-none block">CONTROLLER LINK</span>
                       <div className="flex bg-black/40 border border-white/10 p-2.5 rounded-xl items-center justify-between gap-2">
-                        <span className="text-[10px] text-zinc-400 font-mono truncate select-all">
-                          {window.location.host}/controller
-                        </span>
-                        <button
-                          onClick={handleCopyLink}
-                          className="text-white/50 hover:text-cyan-400 transition-all cursor-pointer"
-                        >
+                        <span className="text-[10px] text-zinc-400 font-mono truncate select-all">{window.location.host}/controller</span>
+                        <button onClick={handleCopyLink} className="text-white/50 hover:text-cyan-400 transition-all cursor-pointer">
                           {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                         </button>
                       </div>
                     </div>
                   </div>
-
                 </div>
-
-                {/* Instruction Steps */}
                 <div className="bg-white/[0.02] border border-white/5 p-4.5 rounded-2xl space-y-2.5 font-mono text-xxs">
                   <div className="flex items-center gap-2 text-indigo-400 uppercase font-black tracking-wider">
                     <BookOpen className="w-3.5 h-3.5" /> Linking Quick Guide
                   </div>
                   <ol className="list-decimal pl-4.5 leading-relaxed text-white/60 space-y-1">
-                    <li>Open this QR code link on your smartphone's camera.</li>
-                    <li>The custom virtual retro controller webapp will load instantly.</li>
-                    <li>Once it finishes syncing, this dialog panel will close itself!</li>
+                    <li>Scan QR with phone camera or open controller link.</li>
+                    <li>The virtual controller loads instantly on your phone.</li>
+                    <li>Select the same player number and enter the sync code.</li>
                   </ol>
                 </div>
               </div>

@@ -24,8 +24,8 @@
         // Button map: button name -> standard gamepad button index
         const MAP = { "UP": 12, "DOWN": 13, "LEFT": 14, "RIGHT": 15, "A": 1, "B": 0, "X": 3, "Y": 2, "SELECT": 8, "START": 9, "L1": 4, "R1": 5 };
 
-        // Player 1 and Player 2 button states
-        const players = [{}, {}];
+        // 4 player button states
+        const players = [{}, {}, {}, {}];
 
         function buildGamepad(index) {
             const btns = [];
@@ -37,7 +37,7 @@
                 }
             }
             return {
-                id: "Virtual SR5 P" + (index + 1),
+                id: "Virtual SR5 Player " + (index + 1),
                 index: index,
                 connected: true,
                 timestamp: performance.now(),
@@ -47,15 +47,14 @@
             };
         }
 
-        // Always return 4 gamepad slots (P1, P2 always present)
+        // Always return 4 gamepad slots for 4 players
         const origGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : () => [null, null, null, null];
         navigator.getGamepads = function () {
-            const real = origGetGamepads() || [null, null, null, null];
             return [
                 buildGamepad(0),
                 buildGamepad(1),
-                real[2] || null,
-                real[3] || null
+                buildGamepad(2),
+                buildGamepad(3)
             ];
         };
 
@@ -63,7 +62,7 @@
         window.addEventListener('message', function (e) {
             if (e.data && e.data.type === 'GAMEPAD_UPDATE') {
                 const p = e.data.player;
-                if (p === 0 || p === 1) {
+                if (p >= 0 && p <= 3) {
                     players[p][e.data.button] = e.data.state;
                 }
             }

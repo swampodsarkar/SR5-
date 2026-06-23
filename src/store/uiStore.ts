@@ -40,10 +40,16 @@ interface UIState {
   activeRoomId: string | null;
   controllerCode: string;
   controllerCodeP2: string;
+  controllerCodeP3: string;
+  controllerCodeP4: string;
   isControllerConnected: boolean;
   isControllerConnectedP2: boolean;
+  isControllerConnectedP3: boolean;
+  isControllerConnectedP4: boolean;
   setControllerConnected: (connected: boolean) => void;
   setControllerConnectedP2: (connected: boolean) => void;
+  setControllerConnectedP3: (connected: boolean) => void;
+  setControllerConnectedP4: (connected: boolean) => void;
   
   // Actions
   finishBooting: () => void;
@@ -93,6 +99,8 @@ export const useUIStore = create<UIState>((set) => ({
   activeRoomId: null,
   isControllerConnected: false,
   isControllerConnectedP2: false,
+  isControllerConnectedP3: false,
+  isControllerConnectedP4: false,
   controllerCode: localStorage.getItem("sys_controller_code") || (() => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";
@@ -109,6 +117,24 @@ export const useUIStore = create<UIState>((set) => ({
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     localStorage.setItem("sys_controller_code_p2", code);
+    return code;
+  })(),
+  controllerCodeP3: localStorage.getItem("sys_controller_code_p3") || (() => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    localStorage.setItem("sys_controller_code_p3", code);
+    return code;
+  })(),
+  controllerCodeP4: localStorage.getItem("sys_controller_code_p4") || (() => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    localStorage.setItem("sys_controller_code_p4", code);
     return code;
   })(),
   gamesList: MOckGames,
@@ -137,6 +163,8 @@ export const useUIStore = create<UIState>((set) => ({
   setBanned: (isBanned) => set({ isBanned }),
   setControllerConnected: (connected) => set({ isControllerConnected: connected }),
   setControllerConnectedP2: (connected) => set({ isControllerConnectedP2: connected }),
+  setControllerConnectedP3: (connected) => set({ isControllerConnectedP3: connected }),
+  setControllerConnectedP4: (connected) => set({ isControllerConnectedP4: connected }),
   setGamesList: (gamesList) => set({ gamesList }),
   setActiveCategory: (cat) => set({ activeCategory: cat }),
   setActiveGame: (id, wallpaper, color) => set({ activeGameId: id, activeWallpaper: wallpaper, activeThemeColor: color }),

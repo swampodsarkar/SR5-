@@ -111,10 +111,11 @@
     firebase.initializeApp(FC);
     const db = firebase.database();
 
-    let ap = 1, p1 = { c: '', on: false, pr: {} }, p2 = { c: '', on: false, pr: {} };
+    let ap = 1, p1 = { c: '', on: false, pr: {} }, p2 = { c: '', on: false, pr: {} }, p3 = { c: '', on: false, pr: {} }, p4 = { c: '', on: false, pr: {} };
     let snd = true, vib = true, scan = false, str = null, si = null;
+    const PL = [p1, p2, p3, p4];
 
-    function gp(n) { return n === 2 ? p2 : p1; }
+    function gp(n) { return PL[n - 1] || p1; }
 
     let ac = null;
     function clk() {
@@ -203,13 +204,27 @@
     function sw(pn) { ap = pn; r(); }
 
     function r() {
-      const both = p1.on && p2.on;
-      if (both) {
-        document.getElementById('app').innerHTML = `<div style="display:flex;flex-direction:column;height:100%;gap:4px">${pd(1,'50%')}<div style="height:1px;background:#ffffff10;flex-shrink:0"></div>${pd(2,'50%')}</div>`;
-        at(1); at(2); return;
+      const connected = [p1.on, p2.on, p3.on, p4.on];
+      const count = connected.filter(Boolean).length;
+      const idx = connected.indexOf(true);
+
+      if (count === 1) {
+        const pn = idx + 1;
+        document.getElementById('app').innerHTML = `<div style="height:100%;display:flex;flex-direction:column" class="container">${pd(pn,'100%')}</div>`;
+        at(pn); return;
       }
-      if (p1.on) { document.getElementById('app').innerHTML = pd(1,'100%'); at(1); return; }
-      if (p2.on) { document.getElementById('app').innerHTML = pd(2,'100%'); at(2); return; }
+      if (count >= 2) {
+        let html = `<div style="display:flex;gap:3px;padding:6px 12px;flex-wrap:wrap;flex-shrink:0;justify-content:center">`;
+        for (let i = 0; i < 4; i++) {
+          if (connected[i]) {
+            const c = ['#06b6d4','#a855f7','#f59e0b','#ef4444'][i];
+            html += `<button onclick="ap=${i+1};r()" style="padding:4px 12px;border-radius:8px;border:1px solid ${c}60;background:${ap===i+1?c+'30':'transparent'};color:${c};font-size:10px;font-weight:700;cursor:pointer">P${i+1}</button>`;
+          }
+        }
+        html += `</div><div style="flex:1;display:flex;flex-direction:column;min-height:0" class="container">${pd(ap,'100%')}</div>`;
+        document.getElementById('app').innerHTML = html;
+        at(ap); return;
+      }
 
       document.getElementById('app').innerHTML = `
         <div class="container">
@@ -218,12 +233,14 @@
             <h1>SR5 Remote</h1>
             <p class="sub">SELECT PLAYER</p>
             <div class="ptabs">
-              <button class="${ap===1?'s1':''}" onclick="sw(1)">P1 ${p1.on?'✓':''}</button>
-              <button class="${ap===2?'s2':''}" onclick="sw(2)">P2 ${p2.on?'✓':''}</button>
+              <button class="${ap===1?'s1':''}" onclick="sw(1)" style="font-size:10px">P1 ${p1.on?'✓':''}</button>
+              <button class="${ap===2?'s2':''}" onclick="sw(2)" style="font-size:10px">P2 ${p2.on?'✓':''}</button>
+              <button style="font-size:10px;${ap===3?'background:#f59e0b20;border-color:#f59e0b60;color:#f59e0b':''}" onclick="sw(3)">P3 ${p3.on?'✓':''}</button>
+              <button style="font-size:10px;${ap===4?'background:#ef444420;border-color:#ef444460;color:#ef4444':''}" onclick="sw(4)">P4 ${p4.on?'✓':''}</button>
             </div>
             <div class="cm">
-              <div class="cmq"><button class="${ap===1?'q1':'q2'}" onclick="startScan(${ap})">📷 Scan QR Code</button></div>
-              <div class="cmm"><span class="lbl">MANUAL CODE</span><div class="rw"><input type="text" maxlength="6" id="mc" placeholder="ABC123" oninput="this.value=this.value.toUpperCase()"><button class="${ap===1?'m1':'m2'}" id="cmb">↵</button></div></div>
+              <div class="cmq"><button style="background:${['#06b6d4','#a855f7','#f59e0b','#ef4444'][ap-1]};color:${ap===4?'#fff':'#000'}" onclick="startScan(${ap})">📷 Scan QR Code</button></div>
+              <div class="cmm"><span class="lbl">MANUAL CODE</span><div class="rw"><input type="text" maxlength="6" id="mc" placeholder="ABC123" oninput="this.value=this.value.toUpperCase()"><button style="background:${['#06b6d4','#a855f7','#f59e0b','#ef4444'][ap-1]};color:${ap===4?'#fff':'#000'}" id="cmb">↵</button></div></div>
             </div>
             <p style="font-size:9px;color:#ffffff25;max-width:260px">Open SR5 Console → smartphone icon → scan QR or enter code</p>
           </div>
@@ -233,7 +250,7 @@
     }
 
     function pd(pn, h) {
-      const p = gp(pn), c = pn===1?'#06b6d4':'#a855f7', nm = 'P'+pn;
+      const p = gp(pn), cols = ['#06b6d4','#a855f7','#f59e0b','#ef4444'], c = cols[pn-1]||'#06b6d4', nm = 'P'+pn;
       const a = (b) => p.pr[b] ? 'a' : '';
       return `<div style="flex:1;display:flex;flex-direction:column;min-height:0;max-height:${h};padding:2px 0" class="container">
         <div class="header">

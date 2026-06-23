@@ -91,9 +91,11 @@ function listenToController(
 }
 
 export function useMobileRemoteController() {
-  const { controllerCode, controllerCodeP2, setControllerConnected, setControllerConnectedP2 } = useUIStore();
+  const { controllerCode, controllerCodeP2, controllerCodeP3, controllerCodeP4, setControllerConnected, setControllerConnectedP2, setControllerConnectedP3, setControllerConnectedP4 } = useUIStore();
   const prevP1 = useRef<Record<string, "down" | "up">>({});
   const prevP2 = useRef<Record<string, "down" | "up">>({});
+  const prevP3 = useRef<Record<string, "down" | "up">>({});
+  const prevP4 = useRef<Record<string, "down" | "up">>({});
 
   useEffect(() => {
     const cleanups: (() => void)[] = [];
@@ -104,11 +106,19 @@ export function useMobileRemoteController() {
     if (controllerCodeP2) {
       cleanups.push(listenToController(controllerCodeP2, 1, setControllerConnectedP2, prevP2, true));
     }
+    if (controllerCodeP3) {
+      cleanups.push(listenToController(controllerCodeP3, 2, setControllerConnectedP3, prevP3, true));
+    }
+    if (controllerCodeP4) {
+      cleanups.push(listenToController(controllerCodeP4, 3, setControllerConnectedP4, prevP4, true));
+    }
 
     return () => {
       cleanups.forEach(fn => fn());
       setControllerConnected(false);
       setControllerConnectedP2(false);
+      setControllerConnectedP3(false);
+      setControllerConnectedP4(false);
     };
-  }, [controllerCode, controllerCodeP2, setControllerConnected, setControllerConnectedP2]);
+  }, [controllerCode, controllerCodeP2, controllerCodeP3, controllerCodeP4, setControllerConnected, setControllerConnectedP2, setControllerConnectedP3, setControllerConnectedP4]);
 }
