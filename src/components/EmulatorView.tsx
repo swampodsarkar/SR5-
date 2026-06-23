@@ -54,11 +54,13 @@ export function EmulatorView() {
   // PeerJS streaming
   const [peerJsLoaded, setPeerJsLoaded] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [sharingPeerId, setSharingPeerId] = useState('');
   const [isViewingStream, setIsViewingStream] = useState(false);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<any>(null);
   const shareStreamRef = useRef<MediaStream | null>(null);
+  const [joinPeerId, setJoinPeerId] = useState('');
 
   // Dynamic PeerJS load
   useEffect(() => {
@@ -104,8 +106,11 @@ export function EmulatorView() {
       const peer = new (window as any).Peer();
       peerRef.current = peer;
       peer.on('open', (id: string) => {
+        setSharingPeerId(id);
         if (activeRoomId) {
           dbSet(ref(rtdb, `rooms/${activeRoomId}/streamPeerId`), id);
+          setIsSharing(true);
+        } else {
           setIsSharing(true);
         }
       });
@@ -254,6 +259,22 @@ export function EmulatorView() {
                 {allConnected.some(Boolean) && <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />}
               </button>
 
+              {/* Share Screen - always visible when emulator is open */}
+              {!isViewingStream && !isSharing && (
+                <button onClick={() => { playSelectSound(); startSharing(); }}
+                  className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 backdrop-blur-md px-4 py-3 rounded-full text-[10px] font-bold tracking-wider transition-all cursor-pointer"
+                >
+                  <Monitor className="w-4 h-4" /> SHARE SCREEN
+                </button>
+              )}
+              {isSharing && (
+                <button onClick={() => { playSelectSound(); stopSharing(); }}
+                  className="flex items-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 backdrop-blur-md px-4 py-3 rounded-full text-[10px] font-bold tracking-wider transition-all cursor-pointer"
+                >
+                  <StopCircle className="w-4 h-4" /> STOP SHARE
+                </button>
+              )}
+
               {/* Dynamic Real-time Co-op matching widget */}
               {activeRoomId && roomData && (
                 <div className="hidden md:flex items-center gap-3.5 bg-zinc-900/80 backdrop-blur-md border border-cyan-500/30 px-5 py-2.5 rounded-full shadow-2xl">
@@ -340,6 +361,42 @@ export function EmulatorView() {
             </motion.div>
           )}
           </AnimatePresence>
+
+          {/* Sharing peer ID display (when sharing outside a room) */}
+          {isSharing && sharingPeerId && !activeRoomId && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute top-24 left-6 z-[120] bg-zinc-900/95 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-4 w-64 shadow-2xl"
+            >
+              <p className="text-[10px] text-white/40 font-mono mb-2">SHARING SCREEN — Give this ID:</p>
+              <p className="text-lg font-bold font-mono tracking-widest text-emerald-400 text-center select-all">{sharingPeerId}</p>
+              <button onClick={() => { navigator.clipboard.writeText(sharingPeerId); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                className="w-full mt-3 text-[10px] bg-emerald-500/10 border border-emerald-500/30 py-2 rounded-xl text-emerald-400 font-mono flex items-center justify-center gap-1.5 cursor-pointer transition-all">
+                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} {copied ? 'Copied!' : 'Copy Peer ID'}
+              </button>
+            </motion.div>
+          )}
+
+          {/* Join Stream input (always visible when not sharing/streaming) */}
+          {!isSharing && !isViewingStream && (
+            <div className="absolute top-24 left-6 z-[120] flex items-center gap-2 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl px-3 py-2 shadow-xl">
+              <input value={joinPeerId} onChange={e => setJoinPeerId(e.target.value.toUpperCase())} placeholder="Enter Peer ID to join stream..." className="w-36 bg-transparent text-[10px] text-white font-mono outline-none placeholder:text-white/20" maxLength={50} />
+              <button onClick={() => {
+                if (!joinPeerId || !peerJsLoaded) return;
+                try {
+                  const peer = new (window as any).Peer();
+                  peer.on('open', () => {
+                    const call = peer.call(joinPeerId, null);
+                    call.on('stream', (stream: MediaStream) => { setRemoteStream(stream); setIsViewingStream(true); });
+                    call.on('close', () => { setIsViewingStream(false); setRemoteStream(null); });
+                  });
+                  peerRef.current = peer;
+                } catch (e) { console.error('Join error:', e); }
+              }}
+                className="bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold px-3 py-1.5 rounded-lg cursor-pointer hover:bg-cyan-500/30 transition-all">JOIN</button>
+            </div>
+          )}
 
           {/* Quick Callouts Trigger Drawers Panel (Right Bottom Side) */}
           {activeRoomId && roomData && (
