@@ -2,83 +2,121 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
   <title>SR5 Controller</title>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
-  </script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
-  </script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { background: #07070a; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; height: 100dvh; touch-action: none; user-select: none; }
-
-    .container { height: 100dvh; display: flex; flex-direction: column; max-width: 500px; margin: 0 auto; padding: 12px; }
+    body { background: #07070a; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; height: 100dvh; height: 100svh; touch-action: none; user-select: none; }
+    .container { height: 100dvh; height: 100svh; display: flex; flex-direction: column; max-width: 500px; margin: 0 auto; padding: 8px 12px; }
 
     /* header */
-    .header { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px; }
-    .status { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .dot.connected { background: #34d399; box-shadow: 0 0 8px #34d399; }
-    .dot.disconnected { background: #ef4444; }
-    .code { font-family: monospace; font-size: 12px; color: #00ffcc; letter-spacing: 2px; }
-    .latency { font-size: 10px; color: #666; font-family: monospace; }
-    .toggles { display: flex; gap: 6px; }
-    .toggles button { background: #1a1a24; border: 1px solid #ffffff15; color: #00ffcc; width: 34px; height: 34px; border-radius: 8px; font-size: 14px; cursor: pointer; }
-    .toggles button.off { color: #ef444460; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 4px; gap: 8px; flex-shrink: 0; }
+    .status { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot.online { background: #34d399; box-shadow: 0 0 8px #34d399; }
+    .dot.offline { background: #ef4444; }
+    .player-tag { font-size: 10px; font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
+    .player-tag.p1 { color: #06b6d4; }
+    .player-tag.p2 { color: #a855f7; }
+    .code-display { font-family: monospace; font-size: 11px; color: #00ffcc; letter-spacing: 2px; }
+    .latency { font-size: 9px; color: #666; font-family: monospace; white-space: nowrap; }
+    .toggles { display: flex; gap: 4px; flex-shrink: 0; }
+    .toggles button { background: #1a1a24; border: 1px solid #ffffff15; width: 32px; height: 32px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .toggles button.off { opacity: 0.4; }
+    .toggles button.danger { color: #ef4444; }
 
-    /* d-pad area */
-    .pad-area { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; }
+    /* gamepad area */
+    .pad-area { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; min-height: 0; }
 
-    .dpad { position: relative; width: 180px; height: 180px; background: #111118; border-radius: 50%; border: 3px solid #000; box-shadow: 0 8px 32px #00000080, inset 0 2px 4px #ffffff08; }
-    .dpad-center { position: absolute; inset: 24px; border-radius: 50%; background: #0a0a0f; border: 1px solid #ffffff08; }
-    .dpad-btn { position: absolute; background: #1a1a24; border: none; color: #ffffff40; font-size: 14px; cursor: pointer; transition: all 80ms; display: flex; align-items: center; justify-content: center; }
+    .dpad { position: relative; width: 160px; height: 160px; background: #111118; border-radius: 50%; border: 3px solid #000; box-shadow: 0 8px 32px #00000080, inset 0 2px 4px #ffffff08; flex-shrink: 0; }
+    .dpad-center { position: absolute; inset: 22px; border-radius: 50%; background: #0a0a0f; border: 1px solid #ffffff08; }
+    .dpad-btn { position: absolute; background: #1a1a24; border: none; color: #ffffff40; font-size: 13px; cursor: pointer; transition: all 60ms; display: flex; align-items: center; justify-content: center; }
     .dpad-btn:active, .dpad-btn.active { background: #00ffcc20; color: #00ffcc; box-shadow: 0 0 12px #00ffcc30; }
-    .dpad-up { top: 0; left: 50%; transform: translateX(-50%); width: 70px; height: 44px; border-radius: 0 0 8px 8px; }
-    .dpad-down { bottom: 0; left: 50%; transform: translateX(-50%); width: 70px; height: 44px; border-radius: 8px 8px 0 0; }
-    .dpad-left { left: 0; top: 50%; transform: translateY(-50%); width: 44px; height: 70px; border-radius: 0 8px 8px 0; }
-    .dpad-right { right: 0; top: 50%; transform: translateY(-50%); width: 44px; height: 70px; border-radius: 8px 0 0 8px; }
+    .dpad-up { top: 0; left: 50%; transform: translateX(-50%); width: 60px; height: 38px; border-radius: 0 0 8px 8px; }
+    .dpad-down { bottom: 0; left: 50%; transform: translateX(-50%); width: 60px; height: 38px; border-radius: 8px 8px 0 0; }
+    .dpad-left { left: 0; top: 50%; transform: translateY(-50%); width: 38px; height: 60px; border-radius: 0 8px 8px 0; }
+    .dpad-right { right: 0; top: 50%; transform: translateY(-50%); width: 38px; height: 60px; border-radius: 8px 0 0 8px; }
 
-    /* shoulder buttons */
-    .shoulders { display: flex; gap: 12px; width: 100%; max-width: 300px; }
-    .shoulders button { flex: 1; padding: 10px; background: #1a1a24; border: 1px solid #ffffff08; border-radius: 10px; color: #ffffff60; font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 80ms; }
-    .shoulders button:active, .shoulders button.active { background: #6366f1; color: #fff; transform: scale(0.95); box-shadow: 0 0 12px #6366f150; }
+    .shoulders { display: flex; gap: 10px; width: 100%; max-width: 280px; flex-shrink: 0; }
+    .shoulders button { flex: 1; padding: 8px; background: #1a1a24; border: 1px solid #ffffff08; border-radius: 8px; color: #ffffff60; font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 60ms; }
+    .shoulders button:active, .shoulders button.active { background: #6366f1; color: #fff; transform: scale(0.95); box-shadow: 0 0 10px #6366f150; }
 
-    /* action buttons */
-    .actions { position: relative; width: 220px; height: 180px; display: flex; align-items: center; justify-content: center; }
-    .action-btn { position: absolute; width: 52px; height: 52px; border-radius: 50%; border: 2px solid #ffffff15; font-size: 18px; font-weight: 800; cursor: pointer; transition: all 80ms; display: flex; align-items: center; justify-content: center; }
-    .action-btn:active, .action-btn.active { transform: scale(0.9); }
+    .mid-row { display: flex; align-items: center; gap: 20px; width: 100%; justify-content: center; flex-shrink: 0; }
+
+    .actions { position: relative; width: 180px; height: 150px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .action-btn { position: absolute; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #ffffff15; font-size: 16px; font-weight: 800; cursor: pointer; transition: all 60ms; display: flex; align-items: center; justify-content: center; }
+    .action-btn:active, .action-btn.active { transform: scale(0.88); }
     .btn-y { top: 0; left: 50%; transform: translateX(-50%); background: #1a1a24; color: #10b981; }
-    .btn-y:active, .btn-y.active { background: #10b981; color: #000; box-shadow: 0 0 12px #10b98150; }
+    .btn-y:active, .btn-y.active { background: #10b981; color: #000; box-shadow: 0 0 10px #10b98150; }
     .btn-x { right: 0; top: 50%; transform: translateY(-50%); background: #1a1a24; color: #3b82f6; }
-    .btn-x:active, .btn-x.active { background: #3b82f6; color: #000; box-shadow: 0 0 12px #3b82f650; }
+    .btn-x:active, .btn-x.active { background: #3b82f6; color: #000; box-shadow: 0 0 10px #3b82f650; }
     .btn-b { left: 0; top: 50%; transform: translateY(-50%); background: #1a1a24; color: #f59e0b; }
-    .btn-b:active, .btn-b.active { background: #f59e0b; color: #000; box-shadow: 0 0 12px #f59e0b50; }
+    .btn-b:active, .btn-b.active { background: #f59e0b; color: #000; box-shadow: 0 0 10px #f59e0b50; }
     .btn-a { bottom: 0; left: 50%; transform: translateX(-50%); background: #1a1a24; color: #ef4444; }
-    .btn-a:active, .btn-a.active { background: #ef4444; color: #000; box-shadow: 0 0 12px #ef444450; }
+    .btn-a:active, .btn-a.active { background: #ef4444; color: #000; box-shadow: 0 0 10px #ef444450; }
 
-    /* bottom row */
-    .bottom-row { display: flex; justify-content: center; gap: 32px; padding: 12px 0; }
-    .pill { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .pill button { width: 56px; height: 22px; border-radius: 20px; background: linear-gradient(180deg,#1a1a24,#0d0d14); border: 1px solid #ffffff08; cursor: pointer; transition: all 80ms; }
+    .bottom-row { display: flex; justify-content: center; gap: 28px; padding: 6px 0; flex-shrink: 0; }
+    .pill { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .pill button { width: 50px; height: 20px; border-radius: 20px; background: linear-gradient(180deg,#1a1a24,#0d0d14); border: 1px solid #ffffff08; cursor: pointer; transition: all 60ms; }
     .pill button:active, .pill button.active { background: linear-gradient(180deg,#cbd5e1,#94a3b8); transform: scale(0.95); }
-    .pill span { font-size: 8px; color: #ffffff60; font-family: monospace; letter-spacing: 2px; font-weight: 700; }
+    .pill span { font-size: 7px; color: #ffffff60; font-family: monospace; letter-spacing: 2px; font-weight: 700; }
 
     /* pairing screen */
-    .pairing { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; text-align: center; padding: 24px; }
-    .pairing h1 { font-size: 18px; font-weight: 800; letter-spacing: 2px; }
-    .pairing p { font-size: 12px; color: #ffffff60; }
-    .pairing input { background: #0a0a0f; border: 1px solid #ffffff15; color: #00ffcc; font-size: 24px; letter-spacing: 8px; text-align: center; padding: 12px 16px; border-radius: 12px; width: 200px; font-family: monospace; text-transform: uppercase; outline: none; }
-    .pairing input:focus { border-color: #00ffcc60; }
-    .pairing button { background: #00ffcc; color: #000; border: none; padding: 12px 28px; border-radius: 12px; font-weight: 800; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; width: 200px; }
-    .pairing button:disabled { background: #1a1a24; color: #444; cursor: not-allowed; }
+    .pairing { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; text-align: center; padding: 20px; }
+    .pairing h1 { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+    .pairing .sub { font-size: 10px; color: #ffffff40; font-family: monospace; letter-spacing: 2px; }
 
-    .error { color: #ef4444; font-size: 11px; }
+    .player-tabs { display: flex; gap: 8px; width: 100%; max-width: 300px; }
+    .player-tabs button { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #ffffff15; background: #0d0d14; color: #ffffff60; font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; transition: all 200ms; }
+    .player-tabs button.active-p1 { background: #06b6d420; border-color: #06b6d460; color: #06b6d4; }
+    .player-tabs button.active-p2 { background: #a855f720; border-color: #a855f760; color: #a855f7; }
+
+    .connect-methods { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 300px; }
+
+    .qr-section { background: #0d0d14; border: 1px solid #ffffff08; border-radius: 16px; padding: 16px; }
+    .qr-section button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; transition: all 200ms; }
+    .qr-btn-p1 { background: #06b6d4; color: #000; }
+    .qr-btn-p2 { background: #a855f7; color: #fff; }
+
+    .manual-section { background: #0d0d14; border: 1px solid #ffffff08; border-radius: 16px; padding: 16px; }
+    .manual-section .label { font-size: 9px; color: #ffffff40; text-align: left; margin-bottom: 8px; font-family: monospace; letter-spacing: 1px; font-weight: 700; display: block; }
+    .manual-section .row { display: flex; gap: 8px; }
+    .manual-section input { flex: 1; background: #07070a; border: 1px solid #ffffff15; color: #00ffcc; font-size: 20px; letter-spacing: 6px; text-align: center; padding: 10px; border-radius: 10px; font-family: monospace; text-transform: uppercase; outline: none; }
+    .manual-section input:focus { border-color: #00ffcc60; }
+    .manual-section button { padding: 10px 16px; border-radius: 10px; border: none; color: #000; font-weight: 700; font-size: 11px; letter-spacing: 1px; cursor: pointer; }
+    .manual-btn-p1 { background: #06b6d4; }
+    .manual-btn-p2 { background: #a855f7; }
+
+    /* QR scanner overlay */
+    .scanner-overlay { position: fixed; inset: 0; z-index: 100; background: #000; display: flex; flex-direction: column; }
+    .scanner-overlay video { width: 100%; flex: 1; object-fit: cover; }
+    .scanner-overlay .scanner-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #0a0a0f; }
+    .scanner-overlay .scanner-header span { font-size: 12px; font-weight: 600; }
+    .scanner-overlay .scanner-header button { background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; padding: 4px 12px; }
+    .scanner-overlay .scanner-footer { padding: 16px; text-align: center; font-size: 11px; color: #ffffff60; }
+    .scanner-overlay .scan-region { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 220px; height: 220px; border: 2px solid #00ffcc80; border-radius: 16px; box-shadow: 0 0 0 9999px #00000080; pointer-events: none; }
+    .scanner-overlay .scan-region::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #00ffcc; border-radius: 2px; animation: scanLine 2s ease-in-out infinite; }
+    @keyframes scanLine { 0%,100% { top: 0; } 50% { top: calc(100% - 3px); } }
+
+    /* responsive */
+    @media (max-height: 640px) {
+      .dpad { width: 130px; height: 130px; }
+      .dpad-center { inset: 18px; }
+      .dpad-up, .dpad-down { width: 50px; height: 30px; }
+      .dpad-left, .dpad-right { width: 30px; height: 50px; }
+      .actions { width: 150px; height: 120px; }
+      .action-btn { width: 38px; height: 38px; font-size: 13px; }
+      .mid-row { gap: 12px; }
+    }
   </style>
 </head>
 <body>
   <div class="container" id="app"></div>
+
   <script>
-    // Firebase config (same as your app)
     const firebaseConfig = {
       apiKey: "AIzaSyAeoScw5UK53ElBnNdhtJVAETb3_isOEKs",
       authDomain: "fram-and-go.firebaseapp.com",
@@ -89,16 +127,20 @@
       appId: "1:781295119002:web:4be2d54934395b491c0d23",
       measurementId: "G-TKPPF986Z0"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     // ── state ──
-    let code = '';
-    let connected = false;
-    let pressed = {};
+    let activePlayer = 1;         // 1 or 2
+    let p1 = { code: '', connected: false, pressed: {} };
+    let p2 = { code: '', connected: false, pressed: {} };
     let soundOn = true;
     let vibOn = true;
+    let scanning = false;
+    let scanStream = null;
+    let scanInterval = null;
+
+    function getP(n) { return n === 2 ? p2 : p1; }
 
     // ── audio ──
     let audioCtx = null;
@@ -116,188 +158,320 @@
         g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
         o.connect(g); g.connect(audioCtx.destination);
         o.start(); o.stop(audioCtx.currentTime + 0.04);
-      } catch (e) { /* ignore */ }
+      } catch (e) {}
     }
-
-    // ── vibration ──
     function vibrate() { if (vibOn && navigator.vibrate) navigator.vibrate(20); }
 
-    // ── firebase helpers ──
-    function sendButton(btn, state) {
-      if (!code || !connected) return;
+    // ── firebase ──
+    function sendButton(player, btn, state) {
+      const p = getP(player);
+      if (!p.code || !p.connected) return;
       const updates = {};
-      updates[`controllers/${code}/state/${btn}`] = state;
-      updates[`controllers/${code}/state/lastUpdated`] = Date.now();
+      updates[`controllers/${p.code}/state/${btn}`] = state;
+      updates[`controllers/${p.code}/state/lastUpdated`] = Date.now();
       db.ref().update(updates).catch(() => {});
     }
 
-    function press(btn) {
-      if (pressed[btn]) return;
-      pressed[btn] = true;
-      playClick();
-      vibrate();
-      sendButton(btn, 'down');
+    function press(player, btn) {
+      const p = getP(player);
+      if (p.pressed[btn]) return;
+      p.pressed[btn] = true;
+      playClick(); vibrate();
+      sendButton(player, btn, 'down');
       render();
     }
 
-    function release(btn) {
-      if (!pressed[btn]) return;
-      pressed[btn] = false;
-      sendButton(btn, 'up');
+    function release(player, btn) {
+      const p = getP(player);
+      if (!p.pressed[btn]) return;
+      p.pressed[btn] = false;
+      sendButton(player, btn, 'up');
       render();
     }
 
-    // ── touch handler factory ──
-    function touchProps(btn) {
+    function touchProps(player, btn) {
       return {
-        onPointerDown(e) { e.preventDefault(); press(btn); },
-        onPointerUp(e) { e.preventDefault(); release(btn); },
-        onPointerLeave(e) { e.preventDefault(); release(btn); },
-        onPointerCancel(e) { release(btn); }
+        onPointerDown(e) { e.preventDefault(); press(player, btn); },
+        onPointerUp(e) { e.preventDefault(); release(player, btn); },
+        onPointerLeave(e) { e.preventDefault(); release(player, btn); },
+        onPointerCancel(e) { release(player, btn); }
       };
     }
 
-    // ── connect ──
-    function connect(targetCode) {
-      code = targetCode.toUpperCase();
+    // ── connect / disconnect ──
+    function connect(player, targetCode) {
+      const p = getP(player);
+      const code = targetCode.toUpperCase();
+      p.code = code;
       const connectedRef = db.ref(`controllers/${code}/connected`);
       const stateRef = db.ref(`controllers/${code}/state`);
 
-      // reset state
       const init = {};
       ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'].forEach(k => init[k] = 'up');
       init.lastUpdated = Date.now();
       stateRef.set(init).then(() => {
         connectedRef.set(true);
-        connected = true;
+        p.connected = true;
         render();
 
-        // latency ping
         const pingRef = db.ref(`controllers/${code}/ping`);
         setInterval(() => {
           const start = Date.now();
           pingRef.set(start).then(() => {
-            document.getElementById('latency').textContent = (Date.now() - start) + 'ms';
+            const el = document.getElementById('latency' + player);
+            if (el) el.textContent = (Date.now() - start) + 'ms';
           });
         }, 5000);
       }).catch(() => { render(); });
     }
 
-    function disconnect() {
-      if (code) {
-        db.ref(`controllers/${code}/connected`).set(null);
-        db.ref(`controllers/${code}/state`).set(null);
+    function disconnect(player) {
+      const p = getP(player);
+      if (p.code) {
+        db.ref(`controllers/${p.code}/connected`).set(null);
+        db.ref(`controllers/${p.code}/state`).set(null);
       }
-      connected = false;
-      code = '';
-      pressed = {};
-      history.replaceState(null, '', '/controller.html');
+      p.connected = false;
+      p.code = '';
+      p.pressed = {};
       render();
     }
 
-    // ── ui ──
-    function render() {
-      const app = document.getElementById('app');
-
-      if (!connected) {
-        app.innerHTML = `
-          <div class="pairing">
-            <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 8px 24px #6366f140">🎮</div>
-            <h1>SR5 Remote<br>Gamepad</h1>
-            <p style="font-family:monospace;font-size:10px;color:#ffffff40;letter-spacing:2px">NET_PROTOCOL v1.0</p>
-            <input type="text" maxlength="6" id="codeInput" placeholder="ABC123" value="${code}" oninput="this.value=this.value.toUpperCase()">
-            <button id="connectBtn">Connect</button>
-            <p style="font-size:10px;color:#ffffff30">Scan QR on SR5 Console → Home → Smartphone icon</p>
+    // ── QR scanner ──
+    function startScanner(player) {
+      if (scanning) return;
+      scanning = true;
+      const el = document.getElementById('app');
+      el.innerHTML = `
+        <div class="scanner-overlay">
+          <div class="scanner-header">
+            <span>Player ${player} — Scan QR Code</span>
+            <button onclick="stopScanner()">✕</button>
           </div>
-        `;
-        document.getElementById('connectBtn').onclick = () => {
-          const val = document.getElementById('codeInput').value;
-          if (val.length === 6) connect(val);
-        };
-        document.getElementById('codeInput').onkeydown = (e) => {
-          if (e.key === 'Enter') {
-            const val = e.target.value;
-            if (val.length === 6) connect(val);
-          }
-        };
-        return;
-      }
-
-      // connected UI
-      app.innerHTML = `
-        <div class="header">
-          <div class="status">
-            <span class="dot connected" style="animation:pulse 2s infinite"></span>
-            <span style="font-size:11px;font-weight:600">P1 SYNCED</span>
-            <span class="code">${code}</span>
-            <span class="latency" id="latency">OK</span>
+          <div style="position:relative;flex:1;overflow:hidden">
+            <video id="qrVideo" autoplay playsinline muted></video>
+            <div class="scan-region"></div>
           </div>
-          <div class="toggles">
-            <button id="soundBtn" class="${soundOn?'':'off'}">🔊</button>
-            <button id="vibBtn" class="${vibOn?'':'off'}">📳</button>
-            <button id="disconnectBtn" style="color:#ef4444">⏻</button>
-          </div>
-        </div>
-
-        <div class="pad-area">
-          <div class="shoulders">
-            <button id="L1" class="${pressed['L1']?'active':''}">L1</button>
-            <button id="R1" class="${pressed['R1']?'active':''}">R1</button>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:24px;width:100%;justify-content:center">
-            <div class="dpad">
-              <div class="dpad-center"></div>
-              <button class="dpad-btn dpad-up" id="UP">▲</button>
-              <button class="dpad-btn dpad-down" id="DOWN">▼</button>
-              <button class="dpad-btn dpad-left" id="LEFT">◀</button>
-              <button class="dpad-btn dpad-right" id="RIGHT">▶</button>
-            </div>
-
-            <div class="actions">
-              <button class="action-btn btn-y" id="Y">Y</button>
-              <button class="action-btn btn-x" id="X">X</button>
-              <button class="action-btn btn-b" id="B">B</button>
-              <button class="action-btn btn-a" id="A">A</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="bottom-row">
-          <div class="pill">
-            <button id="SELECT" class="${pressed['SELECT']?'active':''}"></button>
-            <span>SELECT</span>
-          </div>
-          <div class="pill">
-            <button id="START" class="${pressed['START']?'active':''}"></button>
-            <span>START</span>
-          </div>
+          <div class="scanner-footer">Point your camera at the QR code on the console screen</div>
         </div>
       `;
 
-      // attach events
-      const btns = ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'];
-      btns.forEach(b => {
-        const el = document.getElementById(b);
-        if (el) Object.assign(el, touchProps(b));
-      });
+      const video = document.getElementById('qrVideo');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
 
-      document.getElementById('soundBtn').onclick = () => { soundOn = !soundOn; render(); };
-      document.getElementById('vibBtn').onclick = () => { vibOn = !vibOn; render(); };
-      document.getElementById('disconnectBtn').onclick = disconnect;
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 480 } })
+        .then(stream => {
+          scanStream = stream;
+          video.srcObject = stream;
+          video.play();
+
+          scanInterval = setInterval(() => {
+            if (video.readyState !== 4) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+
+            if (result && result.data) {
+              const detected = result.data;
+              // Try to extract 6-char code from URL or direct text
+              let code = '';
+              const match = detected.match(/[?&]code=([A-Z0-9]{6})/i);
+              if (match) {
+                code = match[1].toUpperCase();
+              } else {
+                const clean = detected.replace(/[^A-Z0-9]/g, '').toUpperCase();
+                if (clean.length >= 6) code = clean.substring(0, 6);
+              }
+
+              if (code.length === 6) {
+                stopScanner();
+                connect(player, code);
+              }
+            }
+          }, 200);
+        })
+        .catch(err => {
+          scanning = false;
+          render();
+        });
     }
 
-    // ── auto-connect from URL param ──
-    const params = new URLSearchParams(location.search);
-    const urlCode = params.get('code');
-    if (urlCode && urlCode.length === 6) {
-      connect(urlCode);
-    } else {
+    function stopScanner() {
+      scanning = false;
+      if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+      if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
       render();
     }
 
-    // ── handle back button ──
-    window.addEventListener('popstate', () => { if (connected) disconnect(); });
+    // ── switch player ──
+    function switchPlayer(n) {
+      activePlayer = n;
+      if (!getP(n).connected) render();
+      else render();
+    }
+
+    // ── render ──
+    function render() {
+      const app = document.getElementById('app');
+      const bothConnected = p1.connected && p2.connected;
+
+      // If both connected, show split view
+      if (bothConnected) {
+        app.innerHTML = `
+          <div style="display:flex;flex-direction:column;height:100%;gap:4px">
+            ${renderPad(1, '50%')}
+            <div style="height:1px;background:#ffffff10;flex-shrink:0"></div>
+            ${renderPad(2, '50%')}
+          </div>
+        `;
+        attachPadEvents(1);
+        attachPadEvents(2);
+        return;
+      }
+
+      // If one player connected, show full pad
+      if (p1.connected) {
+        app.innerHTML = renderPad(1, '100%');
+        attachPadEvents(1);
+        return;
+      }
+      if (p2.connected) {
+        app.innerHTML = renderPad(2, '100%');
+        attachPadEvents(2);
+        return;
+      }
+
+      // Pairing screen
+      app.innerHTML = `
+        <div class="pairing">
+          <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 8px 24px #6366f140">🎮</div>
+          <h1>SR5 Remote</h1>
+          <p class="sub">SELECT PLAYER SLOT</p>
+
+          <div class="player-tabs">
+            <button class="${activePlayer === 1 ? 'active-p1' : ''}" onclick="switchPlayer(1)">
+              P1 ${p1.connected ? '✓' : ''}
+            </button>
+            <button class="${activePlayer === 2 ? 'active-p2' : ''}" onclick="switchPlayer(2)">
+              P2 ${p2.connected ? '✓' : ''}
+            </button>
+          </div>
+
+          <div class="connect-methods">
+            <div class="qr-section">
+              <button class="${activePlayer === 1 ? 'qr-btn-p1' : 'qr-btn-p2'}" onclick="startScanner(${activePlayer})">
+                📷 Scan QR Code
+              </button>
+            </div>
+
+            <div class="manual-section">
+              <span class="label">MANUAL SYNC CODE</span>
+              <div class="row">
+                <input type="text" maxlength="6" id="manualCode" placeholder="ABC123" oninput="this.value=this.value.toUpperCase()">
+                <button class="${activePlayer === 1 ? 'manual-btn-p1' : 'manual-btn-p2'}" id="connectManualBtn">
+                  ↵
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p style="font-size:9px;color:#ffffff25;max-width:260px;line-height:1.5">
+            Open SR5 Console → smartphone icon → scan QR or enter code shown on screen
+          </p>
+        </div>
+      `;
+
+      document.getElementById('connectManualBtn').onclick = () => {
+        const val = document.getElementById('manualCode').value;
+        if (val.length === 6) connect(activePlayer, val);
+      };
+      document.getElementById('manualCode').onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          const val = e.target.value;
+          if (val.length === 6) connect(activePlayer, val);
+        }
+      };
+    }
+
+    function renderPad(player, height) {
+      const p = getP(player);
+      const c = player === 1 ? '#06b6d4' : '#a855f7';
+      const pname = 'P' + player;
+      return `
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0;max-height:${height};padding:2px 0">
+          <div class="header">
+            <div class="status">
+              <span class="dot online"></span>
+              <span class="player-tag ${player === 1 ? 'p1' : 'p2'}">${pname} SYNCED</span>
+              <span class="code-display">${p.code}</span>
+              <span class="latency" id="latency${player}">OK</span>
+            </div>
+            <div class="toggles">
+              <button id="soundBtn${player}" class="${soundOn?'':'off'}">🔊</button>
+              <button id="vibBtn${player}" class="${vibOn?'':'off'}">📳</button>
+              <button class="danger" onclick="disconnect(${player})">⏻</button>
+            </div>
+          </div>
+
+          <div class="pad-area">
+            <div class="shoulders">
+              <button id="L1_${player}" class="${p.pressed['L1']?'active':''}">L1</button>
+              <button id="R1_${player}" class="${p.pressed['R1']?'active':''}">R1</button>
+            </div>
+            <div class="mid-row">
+              <div class="dpad">
+                <div class="dpad-center"></div>
+                <button class="dpad-btn dpad-up" id="UP_${player}">▲</button>
+                <button class="dpad-btn dpad-down" id="DOWN_${player}">▼</button>
+                <button class="dpad-btn dpad-left" id="LEFT_${player}">◀</button>
+                <button class="dpad-btn dpad-right" id="RIGHT_${player}">▶</button>
+              </div>
+              <div class="actions">
+                <button class="action-btn btn-y" id="Y_${player}">Y</button>
+                <button class="action-btn btn-x" id="X_${player}">X</button>
+                <button class="action-btn btn-b" id="B_${player}">B</button>
+                <button class="action-btn btn-a" id="A_${player}">A</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-row">
+            <div class="pill">
+              <button id="SELECT_${player}" class="${p.pressed['SELECT']?'active':''}"></button>
+              <span>SELECT</span>
+            </div>
+            <div class="pill">
+              <button id="START_${player}" class="${p.pressed['START']?'active':''}"></button>
+              <span>START</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function attachPadEvents(player) {
+      ['UP','DOWN','LEFT','RIGHT','A','B','X','Y','SELECT','START','L1','R1'].forEach(btn => {
+        const el = document.getElementById(btn + '_' + player);
+        if (el) Object.assign(el, touchProps(player, btn));
+      });
+      const sb = document.getElementById('soundBtn' + player);
+      if (sb) sb.onclick = () => { soundOn = !soundOn; render(); };
+      const vb = document.getElementById('vibBtn' + player);
+      if (vb) vb.onclick = () => { vibOn = !vibOn; render(); };
+    }
+
+    // ── init ──
+    const params = new URLSearchParams(location.search);
+    const urlCode = params.get('code');
+    if (urlCode && urlCode.length === 6) {
+      connect(1, urlCode);
+    } else {
+      render();
+    }
   </script>
 </body>
 </html>
