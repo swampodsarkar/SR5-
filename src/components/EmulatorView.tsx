@@ -138,6 +138,26 @@ export function EmulatorView() {
     }
   }, [remoteStream]);
 
+  // Detect stream-only mode (joining a stream without a game)
+  const isStreamOnly = gameUrl?.startsWith('stream:');
+  const streamPeerIdFromUrl = isStreamOnly ? gameUrl?.replace('stream:', '') : '';
+
+  // Auto-join stream if streamPeerIdFromUrl is set
+  useEffect(() => {
+    if (!isPlaying || !streamPeerIdFromUrl || !peerJsLoaded) return;
+    const pid = streamPeerIdFromUrl.trim();
+    if (!pid) return;
+    try {
+      const peer = new (window as any).Peer();
+      peer.on('open', () => {
+        const call = peer.call(pid, null);
+        call.on('stream', (stream: MediaStream) => { setRemoteStream(stream); setIsViewingStream(true); });
+        call.on('close', () => { setIsViewingStream(false); setRemoteStream(null); });
+      });
+      peerRef.current = peer;
+    } catch (e) { console.error('Stream join error:', e); }
+  }, [isPlaying, streamPeerIdFromUrl, peerJsLoaded]);
+
   // Game session tracking
   useEffect(() => {
     if (!isPlaying || !activeGameId) return;
@@ -506,13 +526,23 @@ export function EmulatorView() {
             </div>
           )}
 
-          {/* Core emulator frame load (hidden for guest viewing stream) */}
-          <iframe 
-            src={`/emulator.html?core=${playingCore || 'nes'}${gameUrl ? `&url=${encodeURIComponent(gameUrl)}` : ''}`}
-            className={`w-full h-full border-none ${isViewingStream ? 'hidden' : ''}`}
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"
-            allow="gamepad; autoplay; fullscreen"
-          />
+          {/* Core emulator frame load - hidden for stream-only or guest viewing */}
+          {!isStreamOnly && (
+            <iframe 
+              src={`/emulator.html?core=${playingCore || 'nes'}${gameUrl ? `&url=${encodeURIComponent(gameUrl)}` : ''}`}
+              className={`w-full h-full border-none ${isViewingStream ? 'hidden' : ''}`}
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"
+              allow="gamepad; autoplay; fullscreen"
+            />
+          )}
+          {isStreamOnly && !isViewingStream && (
+            <div className="w-full h-full flex items-center justify-center bg-black">
+              <div className="text-center space-y-4">
+                <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-sm text-white/50 font-mono">Connecting to stream...</p>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

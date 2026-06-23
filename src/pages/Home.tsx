@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Background } from "../components/Background";
 import { TopBar } from "../components/TopBar";
 import { GameRow } from "../components/GameRow";
@@ -18,14 +18,19 @@ import { auth, rtdb } from "../lib/firebase";
 import { ref, onChildAdded, onValue, limitToLast, query, set } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Bell, Gamepad2, UserPlus, Check, X, Sparkles, RefreshCw } from "lucide-react";
+import { Shield, Bell, Gamepad2, UserPlus, Check, X, Sparkles, RefreshCw, Monitor, Copy } from "lucide-react";
 
 export function Home() {
   useMobileRemoteController();
-  const { isControlCenterOpen, setControlCenterOpen, isSettingsOpen, isBooting, isBanned, isStoreOpen, isProfileOpen, setActiveRoomId, setProfileOpen, isMaintenanceMode, maintenanceMessage } = useUIStore();
+  const { isControlCenterOpen, setControlCenterOpen, isSettingsOpen, isBooting, isBanned, isStoreOpen, isProfileOpen, setActiveRoomId, setProfileOpen, isMaintenanceMode, maintenanceMessage, playGame } = useUIStore();
   const { playNavigationSound, playSelectSound } = useAudio();
   const [activeNotifications, setActiveNotifications] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Join Stream state
+  const [showJoinInput, setShowJoinInput] = useState(false);
+  const [joinPeerId, setJoinPeerId] = useState('');
+  const [joinCopied, setJoinCopied] = useState(false);
 
   // Listen for maintenance mode
   useEffect(() => {
@@ -422,6 +427,40 @@ export function Home() {
       <GamepadPairingModal />
       <ControlCenter isOpen={isControlCenterOpen} onClose={() => setControlCenterOpen(false)} />
       
+      {/* Floating Join Stream button */}
+      <div className="fixed bottom-20 left-6 z-20 flex flex-col items-start gap-2">
+        <button
+          onClick={() => { playSelectSound(); setShowJoinInput(!showJoinInput); }}
+          className="bg-black/60 backdrop-blur-md border border-cyan-500/30 text-cyan-400 px-4 py-2.5 rounded-full text-[10px] font-bold tracking-wider flex items-center gap-2 hover:bg-black/80 transition-all cursor-pointer shadow-xl"
+        >
+          <Monitor className="w-4 h-4" /> JOIN STREAM
+        </button>
+
+        <AnimatePresence>
+        {showJoinInput && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+            className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 w-72 shadow-2xl"
+          >
+            <p className="text-[10px] text-white/40 font-mono mb-2">Enter friend's Peer ID to watch & play:</p>
+            <div className="flex gap-2">
+              <input value={joinPeerId} onChange={e => setJoinPeerId(e.target.value)} placeholder="e.g. abc123def" className="flex-1 bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none focus:border-cyan-500/50" />
+              <button onClick={() => {
+                if (!joinPeerId) return;
+                playGame('stream', '');
+                // Store peer ID for EmulatorView to pick up
+                useUIStore.setState({ gameUrl: 'stream:' + joinPeerId });
+                setShowJoinInput(false);
+              }}
+                className="bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold px-4 py-2 rounded-xl cursor-pointer hover:bg-cyan-500/30 transition-all">JOIN</button>
+            </div>
+          </motion.div>
+        )}
+        </AnimatePresence>
+      </div>
+
       {/* Helper text */}
       <div className="fixed bottom-4 right-6 text-white/30 text-xs tracking-widest font-mono z-10 pointer-events-none drop-shadow-md">
         PRESS 'P' OR PS BUTTON TO OPEN CONTROL CENTER
