@@ -9,10 +9,7 @@
         .info { position: absolute; top: 20px; right: 20px; color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 8px; font-size: 13px; z-index: 9999; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
     </style>
     <script>
-      // Disable Context Menu
       document.addEventListener('contextmenu', event => event.preventDefault());
-
-      // Disable DevTools shortcuts
       document.addEventListener('keydown', function (e) {
         if (e.key === 'F12' || e.keyCode === 123) { e.preventDefault(); }
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) { e.preventDefault(); }
@@ -24,7 +21,6 @@
     <div id="info" class="info"></div>
     <div id="game-container"></div>
     <script>
-        // P1 & P2 State from parent React app (Mobile Gamepads)
         const STs = [{}, {}];
         const MAP = { "UP": 12, "DOWN": 13, "LEFT": 14, "RIGHT": 15, "A": 1, "B": 0, "X": 3, "Y": 2, "SELECT": 8, "START": 9, "L1": 4, "R1": 5 };
 
@@ -59,9 +55,9 @@
             const real = origGetGamepads() || [null,null,null,null];
             const fake = getFakeGamepads();
             return [
-                fake[0] || real[0] || null, 
-                fake[1] || real[1] || null, 
-                real[2] || null, 
+                fake[0] || real[0] || null,
+                fake[1] || real[1] || null,
+                real[2] || null,
                 real[3] || null
             ];
         };
@@ -72,67 +68,33 @@
             }
         });
 
-        // Make fetch writable to avoid EmulatorJS loader crash
-        try {
-            let originalFetch = window.fetch;
-            Object.defineProperty(window, 'fetch', {
-                configurable: true,
-                get: function() { return originalFetch; },
-                set: function(val) { originalFetch = val; }
-            });
-        } catch(e) {}
-
         const params = new URLSearchParams(window.location.search);
         const core = params.get('core') || 'nes';
         const url = params.get('url') || '';
-        
+
         document.getElementById('info').innerText = `Load any ${core.toUpperCase()} ROM using the emulator interface`;
 
         window.EJS_player = '#game-container';
         window.EJS_core = core;
-        window.EJS_pathtodata = 'https://cdn.jsdelivr.net/gh/EmulatorJS/EmulatorJS@v4.2.1/data/';
+        window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
         window.EJS_color = '#ffffff';
-        
-        // Fix GitHub raw links to load without CORS proxy
+
+        // GitHub raw URLs support CORS natively — no proxy needed
+        // Just set the URL directly and let EmulatorJS handle fetching
         if (url && url !== 'undefined' && url !== 'null') {
-          if (url.startsWith('http')) {
-            // GitHub raw URLs already support CORS — use directly
-            // Proxy is only needed for non-GitHub URLs
-            const isGitHubRaw = url.includes('raw.githubusercontent.com') || url.includes('githubusercontent.com');
-            if (isGitHubRaw) {
-              // Fetch via XHR to ensure binary data integrity, then create blob URL
-              var xhr = new XMLHttpRequest();
-              xhr.open('GET', url, true);
-              xhr.responseType = 'arraybuffer';
-              xhr.onload = function() {
-                if (xhr.status === 200) {
-                  var blob = new Blob([xhr.response], { type: 'application/octet-stream' });
-                  var blobUrl = URL.createObjectURL(blob);
-                  window.EJS_gameUrl = blobUrl;
-                  window.EJS_startOnLoaded = true;
-                  // Auto-start the emulator
-                  if (window.EJS_emulator && window.EJS_emulator.startGame) {
-                    window.EJS_emulator.startGame(blobUrl);
-                  }
+            if (url.startsWith('http')) {
+                const isGitHubRaw = url.includes('raw.githubusercontent.com') || url.includes('githubusercontent.com');
+                if (isGitHubRaw) {
+                    window.EJS_gameUrl = url;
                 } else {
-                  document.getElementById('info').innerText = 'Failed to load ROM (HTTP ' + xhr.status + ')';
+                    window.EJS_gameUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
                 }
-              };
-              xhr.onerror = function() {
-                document.getElementById('info').innerText = 'Network error loading ROM';
-              };
-              xhr.send();
             } else {
-              // Non-GitHub URLs: use corsproxy.io as a more reliable proxy
-              window.EJS_gameUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
-              window.EJS_startOnLoaded = true;
+                window.EJS_gameUrl = url;
             }
-          } else {
-            window.EJS_gameUrl = url;
             window.EJS_startOnLoaded = true;
-          }
         }
     </script>
-    <script src="https://cdn.jsdelivr.net/gh/EmulatorJS/EmulatorJS@v4.2.1/data/loader.js"></script>
+    <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
 </body>
 </html>
