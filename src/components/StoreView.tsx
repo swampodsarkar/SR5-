@@ -134,12 +134,13 @@ export function StoreView() {
           id: item.id,
           title: item.title,
           subtitle: `${item.subtitle} (Installed)`,
-          image: item.romUrl, // ROM URI attached!
+          image: item.romUrl,
           wallpaper: item.wallpaper,
           themeColor: item.themeColor,
           progress: 100,
           core: item.core,
-          icon: item.icon
+          icon: item.icon,
+          romUrl: item.romUrl
         }));
 
         // Reset game list by loading static ones + newly installed custom ones from the store!

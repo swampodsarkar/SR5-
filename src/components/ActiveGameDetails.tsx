@@ -18,7 +18,7 @@ export function ActiveGameDetails() {
     } else if (activeItem.id === "explore") {
       useUIStore.getState().setProfileOpen(true);
     } else if (activeItem.core) {
-      playGame(activeItem.core);
+      playGame(activeItem.core, activeItem.romUrl || undefined);
     }
   };
 
