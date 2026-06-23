@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Gamepad, Wifi, MessageSquarePlus, Sparkles, Eye, Clock, Coins, Monitor, Play, StopCircle } from "lucide-react";
+import { ArrowLeft, Gamepad, Wifi, MessageSquarePlus, Sparkles, Eye, Clock, Coins, Monitor, StopCircle, Smartphone, Copy, Check, X as XIcon } from "lucide-react";
 import { useUIStore } from "../store/uiStore";
 import { auth, rtdb } from "../lib/firebase";
 import { ref, onValue, push, get, update, set as dbSet } from "firebase/database";
@@ -21,6 +21,35 @@ export function EmulatorView() {
   
   const [roomData, setRoomData] = useState<any>(null);
   const [gameChats, setGameChats] = useState<any[]>([]);
+
+  // Controller pairing in-emulator
+  const [showControllerPanel, setShowControllerPanel] = useState(false);
+  const [ctrlTab, setCtrlTab] = useState<1|2|3|4>(1);
+  const [copied, setCopied] = useState(false);
+  const [localIp, setLocalIp] = useState('');
+
+  // Detect local network IP for QR code
+  useEffect(() => {
+    try {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel('');
+      pc.createOffer().then(o => pc.setLocalDescription(o));
+      pc.onicecandidate = (ice) => {
+        if (!ice || !ice.candidate) return;
+        const m = ice.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+        if (m && m[1] !== '127.0.0.1') setLocalIp(m[1]);
+      };
+      setTimeout(() => pc.close(), 2000);
+    } catch (e) {}
+  }, []);
+
+  const baseUrl = localIp ? `http://${localIp}:3000` : window.location.origin;
+  const allCodes = [useUIStore.getState().controllerCode, useUIStore.getState().controllerCodeP2, useUIStore.getState().controllerCodeP3, useUIStore.getState().controllerCodeP4];
+  const allConnected = [useUIStore.getState().isControllerConnected, useUIStore.getState().isControllerConnectedP2, useUIStore.getState().isControllerConnectedP3, useUIStore.getState().isControllerConnectedP4];
+  const curCode = allCodes[ctrlTab - 1] || allCodes[0];
+  const curConnected = allConnected[ctrlTab - 1] || false;
+  const ctrlUrl = `${baseUrl}/controller.html?code=${curCode}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=07070a&bgcolor=ffffff&data=${encodeURIComponent(ctrlUrl)}`;
 
   // PeerJS streaming
   const [peerJsLoaded, setPeerJsLoaded] = useState(false);
@@ -205,42 +234,112 @@ export function EmulatorView() {
           className="fixed inset-0 z-[100] bg-black"
         >
           {/* Header Bar panel with action back buttons */}
-          <div className="absolute top-6 left-6 z-[110] flex items-center gap-4">
-            <button 
-              onClick={() => { playNavigationSound(); stopPlaying(); }}
-              className="bg-black/50 hover:bg-black/80 text-white backdrop-blur-md px-6 py-3 rounded-full tracking-wider font-bold transition-all flex items-center gap-3 border border-white/20 hover:scale-105 active:scale-95 shadow-2xl cursor-pointer"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Quit Console
-            </button>
+          <div className="absolute top-6 left-6 right-6 z-[110] flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => { playNavigationSound(); stopPlaying(); }}
+                className="bg-black/50 hover:bg-black/80 text-white backdrop-blur-md px-6 py-3 rounded-full tracking-wider font-bold transition-all flex items-center gap-3 border border-white/20 hover:scale-105 active:scale-95 shadow-2xl cursor-pointer"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                Quit Console
+              </button>
 
-            {/* Dynamic Real-time Co-op matching widget */}
-            {activeRoomId && roomData && (
-              <div className="hidden md:flex items-center gap-3.5 bg-zinc-900/80 backdrop-blur-md border border-cyan-500/30 px-5 py-2.5 rounded-full shadow-2xl">
-                <div className="flex items-center gap-1.5 font-mono text-cyan-400 font-extrabold animate-pulse">
-                  <Wifi className="w-4 h-4" />
-                  <span className="text-[10px] tracking-widest leading-none">RETRONET CO-OP</span>
+              {/* Controller floating button */}
+              <button
+                onClick={() => { playSelectSound(); setShowControllerPanel(!showControllerPanel); }}
+                className={`flex items-center gap-2 bg-black/50 backdrop-blur-md px-4 py-3 rounded-full border transition-all cursor-pointer ${showControllerPanel ? 'border-cyan-400/50 text-cyan-400' : 'border-white/20 text-white/70 hover:text-white'}`}
+              >
+                <Smartphone className="w-4 h-4" />
+                <span className="text-[10px] font-bold tracking-wider">CONTROLLER</span>
+                {allConnected.some(Boolean) && <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />}
+              </button>
+
+              {/* Dynamic Real-time Co-op matching widget */}
+              {activeRoomId && roomData && (
+                <div className="hidden md:flex items-center gap-3.5 bg-zinc-900/80 backdrop-blur-md border border-cyan-500/30 px-5 py-2.5 rounded-full shadow-2xl">
+                  <div className="flex items-center gap-1.5 font-mono text-cyan-400 font-extrabold animate-pulse">
+                    <Wifi className="w-4 h-4" />
+                    <span className="text-[10px] tracking-widest leading-none">RETRONET CO-OP</span>
+                  </div>
+                  <div className="w-[1px] h-3.5 bg-white/10" />
+                  <span className="text-xs text-white/50 leading-none truncate max-w-xs">{roomData.roomName}</span>
+                  <div className="w-[1px] h-3.5 bg-white/10" />
+                  {!isViewingStream && !isSharing && (
+                    <button
+                      onClick={() => { playSelectSound(); startSharing(); }}
+                      className="text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 cursor-pointer transition-all bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30"
+                    >
+                      <Monitor className="w-3 h-3" /> Share Screen
+                    </button>
+                  )}
+                  {isSharing && (
+                    <button
+                      onClick={() => { playSelectSound(); stopSharing(); }}
+                      className="text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 cursor-pointer transition-all bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+                    >
+                      <StopCircle className="w-3 h-3" /> Stop Stream
+                    </button>
+                  )}
                 </div>
-                <div className="w-[1px] h-3.5 bg-white/10" />
-                <span className="text-xs text-white/50 leading-none truncate max-w-xs">{roomData.roomName}</span>
-                <div className="w-[1px] h-3.5 bg-white/10" />
-                <div className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 font-bold leading-none">
-                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping mr-1" />
-                  LATENCY: 12ms
-                </div>
-                <div className="w-[1px] h-3.5 bg-white/10" />
-                {!isViewingStream && (
-                  <button
-                    onClick={() => { playSelectSound(); isSharing ? stopSharing() : startSharing(); }}
-                    className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 cursor-pointer transition-all ${isSharing ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'}`}
-                  >
-                    {isSharing ? <StopCircle className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
-                    {isSharing ? 'Stop Stream' : 'Share Screen'}
-                  </button>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
+
+          {/* Controller pairing panel (sliding overlay) */}
+          <AnimatePresence>
+          {showControllerPanel && (
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="absolute top-24 left-6 z-[120] bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-5 w-72 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-bold tracking-widest text-white/80 font-mono">PAIR CONTROLLER</h4>
+                <button onClick={() => setShowControllerPanel(false)} className="text-white/40 hover:text-white cursor-pointer"><XIcon className="w-4 h-4" /></button>
+              </div>
+
+              {/* P1-P4 tabs */}
+              <div className="grid grid-cols-4 gap-1 mb-4">
+                {[1,2,3,4].map(n => {
+                  const colors = ['#06b6d4','#a855f7','#f59e0b','#ef4444'];
+                  return (
+                    <button key={n} onClick={() => { playSelectSound(); setCtrlTab(n as any); }}
+                      className={`py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${ctrlTab === n ? 'text-white border' : 'text-white/40 border border-transparent'}`}
+                      style={ctrlTab === n ? { background: colors[n-1] + '20', borderColor: colors[n-1] + '50', color: colors[n-1] } : {}}
+                    >P{n} {allConnected[n-1] ? '✓' : ''}</button>
+                  );
+                })}
+              </div>
+
+              {curConnected ? (
+                <div className="text-center py-4 space-y-2">
+                  <div className="w-10 h-10 mx-auto rounded-full flex items-center justify-center border-2" style={{ borderColor: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][ctrlTab-1], background: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][ctrlTab-1] + '20' }}>
+                    <Wifi className="w-5 h-5" style={{ color: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][ctrlTab-1] }} />
+                  </div>
+                  <p className="text-xs font-bold font-mono" style={{ color: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][ctrlTab-1] }}>P{ctrlTab} LINKED</p>
+                  <p className="text-[10px] text-white/40">Controller connected</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-center">
+                    <img key={qrUrl} src={qrUrl} alt="QR" className="w-28 h-28 border border-white/5 rounded-xl bg-white p-1" />
+                  </div>
+                  <div className="text-center">
+                    <span className="text-lg font-bold font-mono tracking-widest" style={{ color: ['#06b6d4','#a855f7','#f59e0b','#ef4444'][ctrlTab-1] }}>
+                      {curCode.slice(0,3)} {curCode.slice(3)}
+                    </span>
+                  </div>
+                  <button onClick={() => { navigator.clipboard.writeText(ctrlUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                    className="w-full text-[10px] bg-white/5 border border-white/10 py-2 rounded-xl text-white/60 hover:text-white font-mono flex items-center justify-center gap-1.5 cursor-pointer transition-all">
+                    {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    {copied ? 'Copied!' : 'Copy Link'}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          )}
+          </AnimatePresence>
 
           {/* Quick Callouts Trigger Drawers Panel (Right Bottom Side) */}
           {activeRoomId && roomData && (
